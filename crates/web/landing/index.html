@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en" data-mode="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>dry · engines that run in your browser</title>
+  <meta name="description" content="dry: engines with phases, artifacts, scenes and real controls for their questions. Runs entirely in your browser against your own model server.">
+  <!-- The app's own tokens (themes/abyss.md) and the abyss scene's colours (scenes/abyss.md, --scene-<key>), written in by the wasm module; these are the same values, so the first paint already matches. -->
+  <style id="tokens">:root{--background_body:#02040BFF;--background_surface:#0A1224CC;--text_primary:#E8F4FFFF;--text_secondary:#8FA6C2FF;--accent:#4FE3FFFF;--accent_muted:#4FE3FF33;--border_emphasized:#4FE3FF55;--scene-j:#4FE3FFFF;--scene-m:#FF5AD9FF}</style>
+  <style>
+    @font-face{font-family:"Amarante";src:url("app/fonts/Amarante-Regular.ttf") format("truetype");font-display:swap}
+    *{box-sizing:border-box}
+    html,body{margin:0;background:var(--background_body);color:var(--text_primary);font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
+    #scene{position:fixed;inset:0;width:100vw;height:100vh;z-index:0;pointer-events:none}
+    .veil{position:fixed;inset:0;z-index:1;pointer-events:none;background:radial-gradient(ellipse at 50% 30%,transparent 0%,color-mix(in srgb,var(--background_body) 55%,transparent) 70%)}
+    main{position:relative;z-index:2;max-width:1080px;margin:0 auto;padding:0 20px 64px}
+    a{color:var(--accent)}
+    .hero{min-height:88vh;display:flex;flex-direction:column;justify-content:center;gap:22px;padding:72px 0 40px}
+    .kicker{letter-spacing:.24em;text-transform:uppercase;font-size:12px;color:var(--text_secondary)}
+    h1{font-family:"Amarante",Georgia,serif;font-weight:400;font-size:clamp(84px,16vw,184px);line-height:.85;margin:0;
+       background:linear-gradient(100deg,var(--scene-j) 10%,var(--text_primary) 45%,var(--scene-m) 90%);-webkit-background-clip:text;background-clip:text;color:transparent;
+       filter:drop-shadow(0 0 32px color-mix(in srgb,var(--accent) 35%,transparent))}
+    .lede{font-size:clamp(18px,2.4vw,24px);max-width:720px;color:var(--text_primary);margin:0}
+    .lede b{color:var(--accent);font-weight:600}
+    .cta{display:flex;flex-wrap:wrap;gap:12px;margin-top:6px}
+    .btn{display:inline-flex;align-items:center;gap:8px;padding:13px 22px;border-radius:999px;font-weight:600;text-decoration:none;border:1px solid var(--border_emphasized);
+         color:var(--text_primary);background:color-mix(in srgb,var(--background_surface) 70%,transparent);backdrop-filter:blur(14px) saturate(1.4);transition:transform .15s,box-shadow .15s}
+    .btn:hover{transform:translateY(-1px);box-shadow:0 0 0 1px var(--accent),0 8px 32px color-mix(in srgb,var(--accent) 30%,transparent)}
+    .btn.primary{background:var(--accent);color:var(--background_body);border-color:transparent}
+    .glass{background:color-mix(in srgb,var(--background_surface) 78%,transparent);border:1px solid color-mix(in srgb,var(--border_emphasized) 60%,transparent);
+           border-radius:20px;backdrop-filter:blur(18px) saturate(1.5);-webkit-backdrop-filter:blur(18px) saturate(1.5)}
+    h2{font-family:"Amarante",Georgia,serif;font-weight:400;font-size:clamp(34px,5vw,52px);margin:56px 0 18px;line-height:1}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+    .card{padding:20px 20px 18px}
+    .card .g{font-size:26px;color:var(--accent);line-height:1}
+    .card h3{margin:10px 0 6px;font-size:18px}
+    .card p{margin:0;color:var(--text_secondary);font-size:15px}
+    .ways{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+    .way{padding:24px;display:flex;flex-direction:column;gap:12px}
+    .way h3{margin:0;font-size:22px}
+    .way p,.way li{color:var(--text_secondary)}
+    .way ol{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px}
+    code{font:13px ui-monospace,Menlo,Consolas,monospace;background:color-mix(in srgb,var(--accent) 12%,transparent);border-radius:6px;padding:1px 6px;color:var(--text_primary)}
+    .ask-demo{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
+    .ask-demo span{padding:6px 14px;border-radius:999px;border:1px solid var(--border_emphasized);font-size:14px}
+    .ask-demo span.on{background:var(--accent_muted);border-color:var(--accent)}
+    footer{margin-top:64px;color:var(--text_secondary);font-size:14px;display:flex;flex-wrap:wrap;gap:8px 20px}
+    @media (max-width:520px){.hero{min-height:auto;padding-top:48px}}
+  </style>
+</head>
+<body>
+  <canvas id="scene" aria-hidden="true"></canvas>
+  <div class="veil" aria-hidden="true"></div>
+  <main>
+    <section class="hero">
+      <div class="kicker">engines · phases · artifacts · scenes · asks</div>
+      <h1>dry</h1>
+      <p class="lede">A place where <b>engines</b> work: each one a model with a goal, tools and its own artifacts, stepping through <b>phases</b> until it replies, and asking you with <b>real controls</b>, not paragraphs. It runs <b>entirely in this browser</b>, against the model server you choose.</p>
+      <div class="cta">
+        <a class="btn primary" href="app/">Open the app →</a>
+        <a class="btn" href="#local">Run locally with LM Studio</a>
+      </div>
+    </section>
+
+    <h2>What is in it</h2>
+    <div class="grid">
+      <div class="glass card"><div class="g">✦</div><h3>Engines</h3><p>A model, a goal, a response contract and tools. A turn is steps until a reply; one step runs all its calls together. No step limit.</p></div>
+      <div class="glass card"><div class="g">◇</div><h3>Child engines</h3><p><code>engine_call</code> waits for a helper's reply; <code>engine_start</code> hears back later. Children share their level's context.</p></div>
+      <div class="glass card"><div class="g">▤</div><h3>Artifacts</h3><p>Working material each engine keeps: plans, notes, files, terminals, shared feeds, what it learned. Every one is in the prompt as it is now.</p></div>
+      <div class="glass card"><div class="g">⇢</div><h3>Phases</h3><p>A template lays out the prompt and the phases a run walks through, each with its own tools. Skills load when needed.</p></div>
+      <div class="glass card"><div class="g">◐</div><h3>Scenes</h3><p>A living background, chosen apart from the theme: the jellyfish behind this page are the app's own <em>abyss</em> scene, drawn from the same code as the desktop window.</p></div>
+      <div class="glass card"><div class="g">☑</div><h3>A2UI asks</h3><p>A reply can ask with a control: a choice, a few picks, yes or no, a calendar, a number, a field, a card to confirm.</p>
+        <div class="ask-demo" aria-hidden="true"><span>Lisbon</span><span class="on">Porto</span><span>Seville</span></div></div>
+      <div class="glass card"><div class="g">⌂</div><h3>Yours, local</h3><p>State lives in this browser's IndexedDB. Nothing is sent anywhere but the model server you set. Keys never ship in the page.</p></div>
+      <div class="glass card"><div class="g">⟁</div><h3>One core</h3><p>The same Rust core runs the desktop app, a server and this page (WebAssembly). Stores, models and hosts are traits with swappable parts.</p></div>
+    </div>
+
+    <h2 id="ways">Two ways to use it</h2>
+    <div class="ways">
+      <div class="glass way">
+        <h3>Open the app</h3>
+        <p>Load the demo to look around with no model at all: engines with a history, artifacts, a child engine, an open ask and an answered one.</p>
+        <p>Then point it at a model server in Settings → Models and send a message.</p>
+        <div class="cta"><a class="btn primary" href="app/">Open the app →</a></div>
+      </div>
+      <div class="glass way" id="local">
+        <h3>Run locally with LM Studio</h3>
+        <ol>
+          <li>Install <a href="https://lmstudio.ai" rel="noopener">LM Studio</a> and download a model.</li>
+          <li>Open <b>Developer</b>, load the model and start the server (port <code>1234</code>).</li>
+          <li>In the server's <b>Settings</b>, turn on <b>Enable CORS</b>.</li>
+          <li>Open the app, then <b>Settings → Models → Detect</b>; it picks the loaded model.</li>
+          <li>Chrome asks once to let this site reach <b>apps on your device</b> (local network access): allow it.</li>
+        </ol>
+        <p>Safari blocks an https page from calling <code>http://localhost</code>; use Chrome or Firefox, or serve the app from your own machine (see <code>docs/browser.md</code>).</p>
+      </div>
+    </div>
+
+    <footer>
+      <span>dry · built in Rust · the app runs as WebAssembly in your browser</span>
+      <a href="app/">Open the app</a>
+    </footer>
+  </main>
+  <script type="module">
+    // The app's module, for its scene and tokens only (it starts the app
+    // only on the app's own page).
+    try {
+      const m = await import('./app/dry-web.js');
+      await m.default({ module_or_path: './app/dry-web_bg.wasm' });
+      m.landing('scene', 'abyss', 'abyss');
+    } catch (e) { console.warn('the scene did not start', e); }
+  </script>
+</body>
+</html>

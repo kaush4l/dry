@@ -1,0 +1,252 @@
+{
+  "tools": [
+    {
+      "name": "claude",
+      "icon": "✳",
+      "description": "Claude Code, headless (claude -p), as a dry worker: hooks push dry's snapshot into each turn (--settings), the engines tools (mcp/engines.json) read state and post, start or call child engines, and permission requests become approvals (mcp__engines__approve). Its tool calls show live (stream-json). Also the app's own tools (mcp/dry.json) and the model and engine-settings tools (mcp/settings.json). Continues its own session with --resume.",
+      "start": [
+        "claude",
+        "-p",
+        "{prompt}",
+        "--settings",
+        "{settings}",
+        "--mcp-config",
+        "mcp/dry.json",
+        "mcp/settings.json",
+        "mcp/engines.json",
+        "--allowedTools",
+        "mcp__dry",
+        "mcp__settings",
+        "mcp__engines",
+        "--permission-prompt-tool",
+        "mcp__engines__approve",
+        "--output-format",
+        "stream-json",
+        "--verbose"
+      ],
+      "resume": [
+        "claude",
+        "-p",
+        "{prompt}",
+        "--settings",
+        "{settings}",
+        "--mcp-config",
+        "mcp/dry.json",
+        "mcp/settings.json",
+        "mcp/engines.json",
+        "--allowedTools",
+        "mcp__dry",
+        "mcp__settings",
+        "mcp__engines",
+        "--permission-prompt-tool",
+        "mcp__engines__approve",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--resume",
+        "{id}"
+      ],
+      "output": "jsonl",
+      "live": "stream-json",
+      "reply": [
+        {
+          "path": "result",
+          "when": {
+            "type": "result",
+            "is_error": "false"
+          }
+        }
+      ],
+      "id": [
+        {
+          "path": "session_id",
+          "when": {
+            "type": "result"
+          }
+        },
+        {
+          "path": "session_id",
+          "when": {
+            "type": "system",
+            "subtype": "init"
+          }
+        }
+      ],
+      "error": [
+        {
+          "path": "result",
+          "when": {
+            "type": "result",
+            "is_error": "true"
+          }
+        }
+      ],
+      "meta_skip": [
+        "assistant",
+        "user",
+        "system",
+        "rate_limit_event",
+        "stream_event",
+        "result.time_to_request_phases_ms",
+        "result.input_attachments_detail",
+        "result.tool_schema_build_detail",
+        "result.message_normalization_detail",
+        "result.request_build_detail",
+        "result.model_usage_since_last_result",
+        "result.permission_denials",
+        "result.result",
+        "result.credential_expires_at"
+      ],
+      "settings": {
+        "hooks": {
+          "SessionStart": [
+            {
+              "matcher": "startup|clear|compact",
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "'{dry}' snapshot --engine '{engine}' --start"
+                }
+              ]
+            }
+          ],
+          "UserPromptSubmit": [
+            {
+              "hooks": [
+                {
+                  "type": "command",
+                  "command": "'{dry}' snapshot --engine '{engine}' --cursor '{cursor}'"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "env": {
+        "DRY_ENGINE": "{engine}"
+      }
+    },
+    {
+      "name": "codex",
+      "icon": "◎",
+      "description": "Codex, headless (codex exec --json). Continues its thread with exec resume.",
+      "start": [
+        "codex",
+        "exec",
+        "--skip-git-repo-check",
+        "--json",
+        "{prompt}"
+      ],
+      "resume": [
+        "codex",
+        "exec",
+        "resume",
+        "--skip-git-repo-check",
+        "--json",
+        "{id}",
+        "{prompt}"
+      ],
+      "output": "jsonl",
+      "reply": [
+        {
+          "path": "item.text",
+          "when": {
+            "type": "item.completed",
+            "item.type": "agent_message"
+          }
+        }
+      ],
+      "id": [
+        {
+          "path": "thread_id"
+        }
+      ],
+      "error": [
+        {
+          "path": "error.message",
+          "when": {
+            "type": "turn.failed"
+          }
+        },
+        {
+          "path": "message",
+          "when": {
+            "type": "error"
+          }
+        }
+      ],
+      "meta_skip": [
+        "item.completed.item.text"
+      ]
+    },
+    {
+      "name": "pi",
+      "icon": "π",
+      "description": "pi, headless (pi -p --mode json). Continues its session with --session.",
+      "start": [
+        "pi",
+        "-p",
+        "--mode",
+        "json",
+        "{prompt}"
+      ],
+      "resume": [
+        "pi",
+        "-p",
+        "--mode",
+        "json",
+        "--session",
+        "{id}",
+        "{prompt}"
+      ],
+      "output": "jsonl",
+      "reply": [
+        {
+          "path": "message.content.0.text",
+          "when": {
+            "type": "message_end",
+            "message.role": "assistant"
+          }
+        }
+      ],
+      "id": [
+        {
+          "path": "id",
+          "when": {
+            "type": "session"
+          }
+        }
+      ],
+      "error": [
+        {
+          "path": "message.errorMessage",
+          "when": {
+            "type": "message_end",
+            "message.stopReason": "error"
+          }
+        }
+      ],
+      "meta_skip": [
+        "agent_end.messages",
+        "message_start",
+        "message_update",
+        "turn_end.message.content",
+        "message_end.message.content",
+        "turn_end.toolResults"
+      ]
+    },
+    {
+      "name": "hermes",
+      "icon": "☤",
+      "description": "Hermes, one-shot (hermes -z). Writes a usage report; no resume, so each turn starts fresh.",
+      "start": [
+        "hermes",
+        "-z",
+        "{prompt}",
+        "--usage-file",
+        "{meta_file}"
+      ],
+      "output": "text"
+    }
+  ]
+}

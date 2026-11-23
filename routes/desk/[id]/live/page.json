@@ -1,0 +1,12 @@
+{
+  "title": "Live view",
+  "icon": "⌨",
+  "nav": "no",
+  "order": 12,
+  "view": [
+    {
+      "type": "use",
+      "name": "live-workbench"
+    }
+  ]
+}

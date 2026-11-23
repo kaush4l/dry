@@ -1,0 +1,26 @@
+# dry-server as a systemd user service on Linux (docs/server.md).
+# Copy to ~/.config/systemd/user/dry-server.service, set the paths, put the
+# token in ~/.config/dry/server.env (DRY_SERVER_TOKEN=..., chmod 600), then:
+#   systemctl --user daemon-reload && systemctl --user enable --now dry-server
+#   loginctl enable-linger "$USER"     # keep it running with nobody logged in
+# Logs: journalctl --user -u dry-server -f
+[Unit]
+Description=dry-server: the dry host and its web pages (code-server mode)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/dry
+Environment=DRY_ROOT=%h/dry
+EnvironmentFile=%h/.config/dry/server.env
+ExecStart=%h/dry/target/release/dry-server --bind 0.0.0.0 --port 8091
+Restart=on-failure
+RestartSec=5
+# /events streams never end; the server stops within 3 s of SIGTERM.
+TimeoutStopSec=10
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=default.target

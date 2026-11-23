@@ -1,0 +1,36 @@
+# dry in the browser: the app compiled to WebAssembly. The same core and
+# the same renderer (dry-html) as the server, run in the page: the state
+# in IndexedDB, turns sent to the model with fetch (LM Studio on this
+# machine by default). Built into static files with trunk (index.html);
+# see docs/browser.md.
+[package]
+name = "dry-web"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+dry-core = { workspace = true }
+serde_json = { workspace = true }
+
+# The browser bindings; all already in Cargo.lock (through gpui's tree).
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+dry-html = { workspace = true }
+wasm-bindgen = "=0.2.130"
+wasm-bindgen-futures = "0.4.80"
+js-sys = "0.3.107"
+web-sys = { version = "0.3.107", features = [
+  "console", "Window", "Document", "Element", "HtmlElement", "HtmlInputElement", "HtmlTextAreaElement",
+  "HtmlDetailsElement", "Node", "NodeList", "DomTokenList", "Event", "EventTarget", "KeyboardEvent",
+  "Location", "Storage", "Request", "RequestInit", "RequestMode", "Response", "Headers",
+  "IdbFactory", "IdbDatabase", "IdbOpenDbRequest", "IdbRequest", "IdbTransaction", "IdbTransactionMode",
+  "IdbObjectStore", "IdbVersionChangeEvent", "DomException", "DomStringList", "MouseEvent", "DomRect", "CanvasRenderingContext2d", "HtmlCanvasElement", "Performance", "MediaQueryList",
+  "ReadableStream", "ReadableStreamDefaultReader",
+] }
+
+# Only for the IndexedDB test in a real browser (tests/idb.rs); same
+# release line as wasm-bindgen 0.2.130.
+[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+wasm-bindgen-test = "=0.3.80"

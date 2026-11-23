@@ -1,0 +1,43 @@
+banner
+  button "Menu"
+  link "Home"
+  text "›"
+  text "Container"
+  text "in this browser"
+main
+  heading "Container"
+  paragraph
+    text "Alpine Linux in this page: v86 (x86 in WebAssembly), 256 MB. Commands go to its serial console; a port's page comes back over v86's network. docs/container.md."
+  button "Boot"
+  button "Restore saved"
+  button "Run checks"
+  button "Save machine"
+  button "Forget saved"
+  button "Stop"
+  paragraph
+    text "booting Alpine…"
+  form
+    textbox "a command, e.g. uname -a"
+    button "Exec"
+  heading "A port's page"
+  textbox "port" = "8000"
+    text "8000"
+  textbox "path" = "/"
+    text "/"
+  button "Open"
+  paragraph
+    text "Nothing opened yet. Run checks starts python3 -m http.server 8000."
+  heading "Measured"
+  LayoutTable
+contentinfo
+  text "Kept in this browser · indexeddb:dry"
+  text "●"
+  text "local"
+status
+heading "dry, in this browser"
+paragraph
+  text "The whole app runs in this page: engines, their turns, the asks. Nothing is sent anywhere but the model server you set; everything is kept in this browser (indexeddb:dry)."
+button "Load demo"
+button "Start with the translator"
+paragraph
+  text "The translator is dry's default engine: it turns what you ask into a brief for a developer engine and judges what comes back (docs/default.md). The demo shows engines with a history, artifacts, a child engine and asks, with no model server needed. To talk to a model, start LM Studio's server with CORS on (Developer → Settings), then Settings → Models → Detect."

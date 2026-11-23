@@ -1,0 +1,12 @@
+{
+  "title": "Code",
+  "icon": "⌨",
+  "nav": "no",
+  "order": 60,
+  "view": [
+    {
+      "type": "use",
+      "name": "workbench"
+    }
+  ]
+}

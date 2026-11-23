@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "about": "Model providers a companion offers (docs/companion-protocol.md §8). Declared, never scanned: the companion probes only what is in \"providers\". Copy an entry from \"examples\" into \"providers\" and change it. kind cli: claude | codex | copilot (path: the program when it is not on PATH; model: one model). kind port: an OpenAI-compatible server (url; probed with GET <url>/v1/models). kind native: a runner the companion starts on a local port (runner: auto | mlx | llama.cpp; model: a local file or folder, or an id already downloaded). The companion never installs or downloads anything.",
+  "providers": [],
+  "examples": [
+    { "name": "claude", "kind": "cli", "cli": "claude", "model": "sonnet" },
+    { "name": "codex", "kind": "cli", "cli": "codex" },
+    { "name": "copilot", "kind": "cli", "cli": "copilot", "path": "/usr/local/bin/copilot" },
+    { "name": "lmstudio", "kind": "port", "url": "http://127.0.0.1:1234" },
+    { "name": "ollama", "kind": "port", "url": "http://127.0.0.1:11434" },
+    { "name": "vllm", "kind": "port", "url": "http://127.0.0.1:8000" },
+    { "name": "local", "kind": "native", "runner": "auto", "model": "mlx-community/Qwen3-4B-4bit" },
+    { "name": "gguf", "kind": "native", "runner": "llama.cpp", "model": "/models/qwen3-4b-q4_k_m.gguf", "port": 8079 }
+  ]
+}

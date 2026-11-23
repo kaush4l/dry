@@ -1,0 +1,12 @@
+# The core: the app's data and rules. No UI, no disk, no network, so every
+# shell (GPUI window, server, later terminal/web) can depend on it.
+[package]
+name = "dry-core"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+# PNG decode and encode for evidence (pure Rust, so wasm too). Pinned.
+png = "=0.18.1"

@@ -1,0 +1,41 @@
+{
+  "view": [
+    {
+      "type": "panes",
+      "axis": "column",
+      "panes": [
+        {
+          "bar": "activity",
+          "view": [
+            {
+              "type": "link",
+              "label": "❐",
+              "to": "/code"
+            },
+            {
+              "type": "link",
+              "label": "⌂",
+              "to": "/"
+            },
+            {
+              "type": "link",
+              "label": "◐",
+              "to": "/settings/ui"
+            }
+          ]
+        },
+        {
+          "size": 48,
+          "bar": "activity",
+          "view": [
+            {
+              "type": "link",
+              "label": "⚙",
+              "to": "/settings"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

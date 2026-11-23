@@ -1,0 +1,11 @@
+{
+  "title": "Artifact",
+  "icon": "▤",
+  "nav": "no",
+  "order": 11,
+  "view": [
+    {
+      "type": "artifact-page"
+    }
+  ]
+}

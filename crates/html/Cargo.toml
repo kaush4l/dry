@@ -1,0 +1,16 @@
+# The UI as HTML: every route and component drawn from the core's view
+# models, the look as CSS from the theme tokens and the layout standard.
+# Pure: no disk, no network, so the server (crates/server) and the
+# browser (crates/web) draw the same pages.
+[package]
+name = "dry-html"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+dry-core = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+# Only to check that the bundle loader reads the repo's files as the disk loader does.
+dry-tools = { workspace = true }

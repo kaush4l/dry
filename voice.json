@@ -1,0 +1,7 @@
+{
+  "record": ["ffmpeg", "-hide_banner", "-loglevel", "error", "-f", "avfoundation", "-i", ":0", "-t", "{seconds}", "-ac", "1", "-ar", "16000", "-y", "{file}"],
+  "transcribe": ["whisper", "{file}", "--model", "tiny", "--output_format", "txt", "--output_dir", "{dir}"],
+  "seconds": 5,
+  "check": ["ffmpeg", "-hide_banner", "-f", "avfoundation", "-list_devices", "true", "-i", ""],
+  "check_after": "audio devices:"
+}

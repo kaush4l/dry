@@ -1,0 +1,24 @@
+{
+  "title": "Home",
+  "icon": "\u2302",
+  "nav": "yes",
+  "order": 0,
+  "view": [
+    {
+      "type": "use",
+      "name": "welcome"
+    },
+    {
+      "type": "dashboard"
+    },
+    {
+      "type": "analytics",
+      "part": "today"
+    },
+    {
+      "type": "link",
+      "label": "Desk",
+      "to": "/desk"
+    }
+  ]
+}

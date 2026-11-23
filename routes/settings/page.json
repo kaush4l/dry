@@ -1,0 +1,47 @@
+{
+  "title": "Settings",
+  "icon": "⚙︎",
+  "nav": "yes",
+  "order": 90,
+  "view": [
+    {
+      "type": "reset-history"
+    },
+    {
+      "type": "appearance"
+    },
+    {
+      "type": "link",
+      "label": "UI tokens: every colour, size and font",
+      "to": "/settings/ui"
+    },
+    {
+      "type": "link",
+      "label": "Analytics: work, waiting, models and tools",
+      "to": "/analytics"
+    },
+    {
+      "type": "link",
+      "label": "Capabilities: what this runtime can use, by provider",
+      "to": "/settings/capabilities"
+    },
+    {
+      "type": "models"
+    },
+    {
+      "type": "routes"
+    },
+    {
+      "type": "new-route"
+    },
+    {
+      "type": "environment"
+    },
+    {
+      "type": "diagnostics"
+    },
+    {
+      "type": "tools"
+    }
+  ]
+}

@@ -1,0 +1,87 @@
+{
+  "view": [
+    {
+      "type": "panes",
+      "axis": "column",
+      "panes": [
+        {
+          "view": [
+            {
+              "type": "panes",
+              "axis": "row",
+              "resizable": true,
+              "panes": [
+                {
+                  "size": 260,
+                  "min": 170,
+                  "background": "background_surface",
+                  "view": [
+                    {
+                      "type": "live-view",
+                      "part": "explorer"
+                    }
+                  ]
+                },
+                {
+                  "view": [
+                    {
+                      "type": "panes",
+                      "axis": "column",
+                      "resizable": true,
+                      "panes": [
+                        {
+                          "background": "background_body",
+                          "view": [
+                            {
+                              "type": "live-view",
+                              "part": "editor"
+                            }
+                          ]
+                        },
+                        {
+                          "size": 230,
+                          "min": 80,
+                          "background": "background_surface",
+                          "view": [
+                            {
+                              "type": "live-view",
+                              "part": "panel"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "size": 380,
+                  "min": 260,
+                  "background": "background_surface",
+                  "view": [
+                    {
+                      "type": "live-view",
+                      "part": "chat"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "size": 22,
+          "background": "status_bar",
+          "text": "on_status_bar",
+          "border": "border",
+          "edge": "top",
+          "view": [
+            {
+              "type": "live-view",
+              "part": "status"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

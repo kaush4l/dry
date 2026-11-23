@@ -1,0 +1,11 @@
+{
+  "title": "Desk",
+  "icon": "◆",
+  "nav": "yes",
+  "order": 10,
+  "view": [
+    {
+      "type": "desk"
+    }
+  ]
+}

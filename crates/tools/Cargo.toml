@@ -1,0 +1,20 @@
+[package]
+name = "dry-tools"
+version = "0.1.0"
+edition = "2024"
+
+# `dry`: the command-line tools that read and write the app's files
+# (routes/, components/, builtins.json, themes/).
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "dry"
+path = "src/main.rs"
+
+[dependencies]
+dry-core = { workspace = true }
+rusqlite = { workspace = true }
+serde_json = { workspace = true }
+# Asks model servers which models they have (`settings`).
+ureq = { workspace = true }

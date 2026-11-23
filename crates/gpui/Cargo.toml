@@ -1,0 +1,15 @@
+# The native shell: a GPUI window that draws the core state in the layout standard.
+[package]
+name = "dry-gpui"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+dry-core = { workspace = true }
+dry-tools = { workspace = true }
+gpui = { workspace = true }
+gpui_platform = { workspace = true }
+gpui-component = { workspace = true }
+ureq = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

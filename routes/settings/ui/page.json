@@ -1,0 +1,11 @@
+{
+  "title": "UI tokens",
+  "icon": "◐",
+  "nav": "no",
+  "order": 80,
+  "view": [
+    {
+      "type": "tokens"
+    }
+  ]
+}

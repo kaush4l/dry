@@ -1,0 +1,11 @@
+{
+  "title": "Capabilities",
+  "icon": "⌁",
+  "nav": "no",
+  "order": 85,
+  "view": [
+    {
+      "type": "capabilities"
+    }
+  ]
+}

@@ -1,0 +1,106 @@
+main
+  text "ENGINES · PHASES · ARTIFACTS · SCENES · ASKS"
+  heading "dry"
+  paragraph
+    text "A place where"
+    text "engines"
+    text "work: each one a model with a goal, tools and its own artifacts, stepping through"
+    text "phases"
+    text "until it replies, and asking you with"
+    text "real controls"
+    text ", not paragraphs. It runs"
+    text "entirely in this browser"
+    text ", against the model server you choose."
+  link "Open the app →"
+  link "Run locally with LM Studio"
+  heading "What is in it"
+  text "✦"
+  heading "Engines"
+  paragraph
+    text "A model, a goal, a response contract and tools. A turn is steps until a reply; one step runs all its calls together. No step limit."
+  text "◇"
+  heading "Child engines"
+  paragraph
+    code
+      text "engine_call"
+    text "waits for a helper's reply;"
+    code
+      text "engine_start"
+    text "hears back later. Children share their level's context."
+  text "▤"
+  heading "Artifacts"
+  paragraph
+    text "Working material each engine keeps: plans, notes, files, terminals, shared feeds, what it learned. Every one is in the prompt as it is now."
+  text "⇢"
+  heading "Phases"
+  paragraph
+    text "A template lays out the prompt and the phases a run walks through, each with its own tools. Skills load when needed."
+  text "◐"
+  heading "Scenes"
+  paragraph
+    text "A living background, chosen apart from the theme: the jellyfish behind this page are the app's own"
+    emphasis
+      text "abyss"
+    text "scene, drawn from the same code as the desktop window."
+  text "☑"
+  heading "A2UI asks"
+  paragraph
+    text "A reply can ask with a control: a choice, a few picks, yes or no, a calendar, a number, a field, a card to confirm."
+  text "⌂"
+  heading "Yours, local"
+  paragraph
+    text "State lives in this browser's IndexedDB. Nothing is sent anywhere but the model server you set. Keys never ship in the page."
+  text "⟁"
+  heading "One core"
+  paragraph
+    text "The same Rust core runs the desktop app, a server and this page (WebAssembly). Stores, models and hosts are traits with swappable parts."
+  heading "Two ways to use it"
+  heading "Open the app"
+  paragraph
+    text "Load the demo to look around with no model at all: engines with a history, artifacts, a child engine, an open ask and an answered one."
+  paragraph
+    text "Then point it at a model server in Settings → Models and send a message."
+  link "Open the app →"
+  heading "Run locally with LM Studio"
+  list
+    listitem
+      ListMarker "1."
+      text "Install"
+      link "LM Studio"
+      text "and download a model."
+    listitem
+      ListMarker "2."
+      text "Open"
+      text "Developer"
+      text ", load the model and start the server (port"
+      code
+        text "1234"
+      text ")."
+    listitem
+      ListMarker "3."
+      text "In the server's"
+      text "Settings"
+      text ", turn on"
+      text "Enable CORS"
+      text "."
+    listitem
+      ListMarker "4."
+      text "Open the app, then"
+      text "Settings → Models → Detect"
+      text "; it picks the loaded model."
+    listitem
+      ListMarker "5."
+      text "Chrome asks once to let this site reach"
+      text "apps on your device"
+      text "(local network access): allow it."
+  paragraph
+    text "Safari blocks an https page from calling"
+    code
+      text "http://localhost"
+    text "; use Chrome or Firefox, or serve the app from your own machine (see"
+    code
+      text "docs/browser.md"
+    text ")."
+  sectionfooter
+    text "dry · built in Rust · the app runs as WebAssembly in your browser"
+    link "Open the app"

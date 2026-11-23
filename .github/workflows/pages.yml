@@ -1,0 +1,74 @@
+# Build dry for the browser and publish it on GitHub Pages:
+# https://<owner>.github.io/<repo>/ (the landing page) and .../app/ (the
+# wasm app). The base path is the repo's name, so it works for any repo;
+# scripts/web-build.sh does the build, the same as locally.
+#
+# Once: in the repo's Settings → Pages, set Source to "GitHub Actions".
+name: Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deploy at a time; a newer push does not cancel one in progress.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  TRUNK_VERSION: v0.21.14
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4.2.2
+
+      - name: Rust for wasm
+        run: |
+          rustup toolchain install stable --profile minimal --target wasm32-unknown-unknown
+          rustup default stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4.2.3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: wasm-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+
+      - name: Trunk
+        run: |
+          curl -sSL "https://github.com/trunk-rs/trunk/releases/download/${TRUNK_VERSION}/trunk-x86_64-unknown-linux-gnu.tar.gz" | tar -xz -C /usr/local/bin trunk
+          trunk --version
+
+      - name: Tests (core, renderer, browser pieces)
+        run: cargo test -q -p dry-core -p dry-html -p dry-web
+
+      # The container route's Alpine image and packages are in git under
+      # vm/ (docs/container.md); scripts/vm-fetch.py remakes them.
+      - name: Build
+        run: scripts/web-build.sh "/${{ github.event.repository.name }}/"
+
+      - uses: actions/configure-pages@v5.0.0
+
+      - uses: actions/upload-pages-artifact@v3.0.1
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4.0.5

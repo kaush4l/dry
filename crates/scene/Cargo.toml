@@ -1,0 +1,15 @@
+# The theme's scene for pages the server draws: core's scene code
+# (`dry_core::scene`) behind a tiny C ABI, built to WebAssembly and served
+# by dry-server as /assets/scene.wasm (scripts/scene-wasm.sh). No
+# wasm-bindgen: the page's script (crates/server/assets/scene.js) calls the
+# exports and paints the rectangles. See docs/scenes.md.
+[package]
+name = "dry-scene"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+dry-core = { workspace = true }

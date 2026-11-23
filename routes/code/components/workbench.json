@@ -1,0 +1,96 @@
+{
+  "view": [
+    {
+      "type": "panes",
+      "axis": "column",
+      "panes": [
+        {
+          "view": [
+            {
+              "type": "panes",
+              "axis": "row",
+              "panes": [
+                {
+                  "size": 48,
+                  "background": "window_tint",
+                  "text": "text_accent",
+                  "border": "border",
+                  "edge": "right",
+                  "view": [
+                    {
+                      "type": "use",
+                      "name": "activity-bar"
+                    }
+                  ]
+                },
+                {
+                  "view": [
+                    {
+                      "type": "panes",
+                      "axis": "row",
+                      "resizable": true,
+                      "panes": [
+                        {
+                          "size": 250,
+                          "min": 170,
+                          "background": "background_surface",
+                          "view": [
+                            {
+                              "type": "explorer"
+                            }
+                          ]
+                        },
+                        {
+                          "view": [
+                            {
+                              "type": "panes",
+                              "axis": "column",
+                              "resizable": true,
+                              "panes": [
+                                {
+                                  "background": "background_body",
+                                  "view": [
+                                    {
+                                      "type": "editor"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "size": 220,
+                                  "min": 80,
+                                  "background": "background_surface",
+                                  "view": [
+                                    {
+                                      "type": "terminal"
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "size": 22,
+          "background": "status_bar",
+          "text": "on_status_bar",
+          "border": "border",
+          "edge": "top",
+          "view": [
+            {
+              "type": "use",
+              "name": "status-bar"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

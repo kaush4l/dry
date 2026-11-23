@@ -1,0 +1,36 @@
+{"type":"session.tools_updated","data":{"model":"mai-code-2-flash"}}
+{"type":"assistant.message_delta","data":{"messageId":"cf504005","deltaContent":"1"}}
+{"type":"assistant.message_delta","data":{"messageId":"cf504005","deltaContent":" "}}
+{"type":"assistant.message_delta","data":{"messageId":"cf504005","deltaContent":"2"}}
+{"type":"assistant.message_delta","data":{"messageId":"cf504005","deltaContent":" "}}
+{"type":"assistant.message_delta","data":{"messageId":"cf504005","deltaContent":"3"}}
+{"type":"assistant.message_delta","data":{"messageId":"cf504005","deltaContent":" "}}
+{"type":"assistant.message_delta","data":{"messageId":"cf504005","deltaContent":"4"}}
+{"type":"assistant.message_delta","data":{"messageId":"cf504005","deltaContent":" "}}
+{"type":"assistant.message_delta","data":{"messageId":"cf504005","deltaContent":"5"}}
+{"type":"assistant.message_delta","data":{"messageId":"cf504005","deltaContent":" "}}
+{"type":"assistant.message_delta","data":{"messageId":"cf504005","deltaContent":"6"}}
+{"type":"assistant.message_delta","data":{"messageId":"cf504005","deltaContent":" "}}
+{"type":"assistant.message_delta","data":{"messageId":"cf504005","deltaContent":"7"}}
+{"type":"assistant.message_delta","data":{"messageId":"cf504005","deltaContent":" "}}
+{"type":"assistant.message_delta","data":{"messageId":"cf504005","deltaContent":"8"}}
+{"type":"assistant.message_delta","data":{"messageId":"cf504005","deltaContent":" "}}
+{"type":"assistant.message_delta","data":{"messageId":"cf504005","deltaContent":"9 "}}
+{"type":"assistant.message_delta","data":{"messageId":"cf504005","deltaContent":"10 "}}
+{"type":"assistant.message_delta","data":{"messageId":"cf504005","deltaContent":"11 "}}
+{"type":"assistant.message_delta","data":{"messageId":"cf504005","deltaContent":"12 "}}
+{"type":"assistant.message_delta","data":{"messageId":"cf504005","deltaContent":"13 "}}
+{"type":"assistant.message_delta","data":{"messageId":"cf504005","deltaContent":"14 "}}
+{"type":"assistant.message_delta","data":{"messageId":"cf504005","deltaContent":"15 "}}
+{"type":"assistant.message_delta","data":{"messageId":"cf504005","deltaContent":"16 17"}}
+{"type":"assistant.message_delta","data":{"messageId":"cf504005","deltaContent":" 18 "}}
+{"type":"assistant.message_delta","data":{"messageId":"cf504005","deltaContent":"19 20"}}
+{"type":"assistant.message_delta","data":{"messageId":"cf504005","deltaContent":" 21 "}}
+{"type":"assistant.message_delta","data":{"messageId":"cf504005","deltaContent":"22 23"}}
+{"type":"assistant.message_delta","data":{"messageId":"cf504005","deltaContent":" 24 "}}
+{"type":"assistant.message_delta","data":{"messageId":"cf504005","deltaContent":"25 26 "}}
+{"type":"assistant.message_delta","data":{"messageId":"cf504005","deltaContent":"27 28 "}}
+{"type":"assistant.message_delta","data":{"messageId":"cf504005","deltaContent":"29 30"}}
+{"type":"assistant.message","data":{"messageId":"cf504005","model":"mai-code-2-flash","content":"1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30","toolRequests":[],"phase":"final_answer","outputTokens":74}}
+{"type":"assistant.turn_end","data":{"turnId":"0"}}
+{"type":"result","exitCode":0,"usage":{"premiumRequests":1,"totalApiDurationMs":2621,"sessionDurationMs":3364,"codeChanges":{"linesAdded":0,"linesRemoved":0,"filesModified":[]}}}

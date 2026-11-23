@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  dry-server as a per-user launchd agent on macOS (docs/server.md).
+  Copy to ~/Library/LaunchAgents/dev.dry.server.plist, replace /Users/you/dry
+  with the checkout (or a copied root) and the binary's path, then:
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/dev.dry.server.plist
+  The token is read from ~/.config/dry/server-token by the shell line below,
+  so it is not in this file. Stop: launchctl bootout gui/$(id -u)/dev.dry.server
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>dev.dry.server</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/sh</string>
+    <string>-c</string>
+    <string>DRY_SERVER_TOKEN="$(cat "$HOME/.config/dry/server-token")" exec /Users/you/dry/target/release/dry-server --bind 0.0.0.0 --port 8091</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>DRY_ROOT</key>
+    <string>/Users/you/dry</string>
+  </dict>
+  <key>WorkingDirectory</key>
+  <string>/Users/you/dry</string>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <dict>
+    <key>SuccessfulExit</key>
+    <false/>
+  </dict>
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
+  <key>ExitTimeOut</key>
+  <integer>10</integer>
+  <key>StandardOutPath</key>
+  <string>/Users/you/Library/Logs/dry-server.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/you/Library/Logs/dry-server.log</string>
+</dict>
+</plist>

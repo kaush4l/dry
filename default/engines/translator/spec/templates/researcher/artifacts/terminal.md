@@ -1,0 +1,2 @@
+uses: [terminal:read]
+root: .

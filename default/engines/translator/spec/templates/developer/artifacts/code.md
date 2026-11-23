@@ -1,0 +1,2 @@
+kind: file
+root: .

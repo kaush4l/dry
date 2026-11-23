@@ -1,0 +1,38 @@
+{
+  "default": "local",
+  "providers": {
+    "openai": {
+      "base_url": "https://api.openai.com/v1",
+      "key_env": "OPENAI_API_KEY"
+    }
+  },
+  "models": [
+    {
+      "name": "local",
+      "id": "openai/c/ripple-65b-abliterated",
+      "base_url": "http://127.0.0.1:1234/v1"
+    },
+    {
+      "name": "gpt",
+      "id": "openai/r/gpt-5-mini"
+    },
+    {
+      "name": "claude/haiku",
+      "kind": "cli",
+      "provider": "claude",
+      "model": "haiku"
+    },
+    {
+      "name": "codex/luna",
+      "kind": "cli",
+      "provider": "codex",
+      "model": "gpt-5.6-luna"
+    },
+    {
+      "name": "copilot/auto",
+      "kind": "cli",
+      "provider": "copilot",
+      "model": "auto"
+    }
+  ]
+}

@@ -1,0 +1,2 @@
+uses: [file:read]
+root: .

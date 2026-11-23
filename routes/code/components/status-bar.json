@@ -1,0 +1,52 @@
+{
+  "view": [
+    {
+      "type": "panes",
+      "axis": "row",
+      "panes": [
+        {
+          "bar": "status",
+          "view": [
+            {
+              "type": "text",
+              "text": "{repo}"
+            },
+            {
+              "type": "text",
+              "text": "{file}"
+            }
+          ]
+        },
+        {
+          "bar": "status",
+          "align": "end",
+          "view": [
+            {
+              "type": "text",
+              "text": "Ln {line}"
+            },
+            {
+              "type": "text",
+              "text": "{lines} lines"
+            },
+            {
+              "type": "text",
+              "text": "UTF-8"
+            },
+            {
+              "type": "text",
+              "text": "{language}"
+            },
+            {
+              "type": "text",
+              "text": "Read-only"
+            },
+            {
+              "type": "theme-picker"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

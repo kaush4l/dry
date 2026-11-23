@@ -1,0 +1,48 @@
+# A workspace: several packages built together, sharing one Cargo.lock and
+# one target/ folder. Each folder under crates/ is one package.
+[workspace]
+resolver = "3"
+members = ["crates/core", "crates/gpui", "crates/html", "crates/scene", "crates/server", "crates/tools", "crates/web"]
+
+# Settings every package inherits with `edition.workspace = true`.
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+
+# Versions chosen once here; a package opts in with `name = { workspace = true }`.
+[workspace.dependencies]
+dry-core = { path = "crates/core" }
+dry-tools = { path = "crates/tools" }
+dry-html = { path = "crates/html" }
+# GPUI (Zed's UI framework), published as gpui-pre. Same pinned version
+# dry-next runs on this Mac.
+gpui = { package = "gpui-pre", version = "=0.3.12", default-features = false, features = ["font-kit"] }
+# The window entry point, `application()`, lives in this platform crate.
+# runtime_shaders: Metal shaders compile at startup, so no Xcode Metal toolchain needed.
+gpui_platform = { package = "gpui-pre-platform", version = "=0.3.12", default-features = false, features = ["font-kit", "runtime_shaders"] }
+# GPUI component library (buttons, textarea, ...). 0.10.0 is the release
+# built on exactly gpui-pre 0.3.12, so both share one GPUI.
+gpui-component = "=0.10.0"
+# Serialisation (models.json) with derive.
+serde = { version = "1.0", features = ["derive"] }
+# A small blocking HTTP client the GPUI shell sends inference requests with.
+ureq = "3.5"
+# JSON for inference requests and replies (pure: no IO).
+serde_json = "1.0"
+# SQLite for the database store (bundled: no system library needed).
+rusqlite = { version = "=0.32.1", features = ["bundled"] }
+# The HTTP server for the web side.
+actix-web = "4.20"
+
+# The PNG encoder and its deflate run optimised even in debug builds, so
+# `dry evidence` (a debug binary, often) encodes a shot in milliseconds.
+[profile.dev.package.png]
+opt-level = 3
+[profile.dev.package.fdeflate]
+opt-level = 3
+[profile.dev.package.flate2]
+opt-level = 3
+[profile.dev.package.miniz_oxide]
+opt-level = 3
+[profile.dev.package.crc32fast]
+opt-level = 3

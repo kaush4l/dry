@@ -1,0 +1,5 @@
+{
+  "mcpServers": {
+    "settings": { "command": "./target/debug/dry", "args": ["mcp", "settings"] }
+  }
+}

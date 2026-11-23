@@ -1,0 +1,16 @@
+{
+  "title": "Analytics",
+  "icon": "▤",
+  "nav": "yes",
+  "order": 85,
+  "view": [
+    {
+      "type": "text",
+      "text": "What the engines did and where the time went, from the spans every turn writes (docs/analytics.md): work vs waiting, models, tools, phases, context, asks, you and the messages between engines."
+    },
+    {
+      "type": "analytics",
+      "part": "page"
+    }
+  ]
+}

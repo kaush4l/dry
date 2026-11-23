@@ -1,0 +1,43 @@
+{
+  "title": "Engine",
+  "icon": "✦",
+  "nav": "per-engine",
+  "order": 10,
+  "view": [
+    {
+      "type": "engine-header"
+    },
+    {
+      "type": "columns",
+      "main": [
+        {
+          "type": "session"
+        },
+        {
+          "type": "composer"
+        }
+      ],
+      "side": [
+        {
+          "type": "analytics",
+          "part": "timeline"
+        },
+        {
+          "type": "artifacts"
+        },
+        {
+          "type": "engine-tools"
+        },
+        {
+          "type": "prompt"
+        },
+        {
+          "type": "response"
+        },
+        {
+          "type": "metadata"
+        }
+      ]
+    }
+  ]
+}

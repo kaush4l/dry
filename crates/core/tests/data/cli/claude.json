@@ -1,0 +1,1 @@
+{"type": "result", "subtype": "success", "is_error": false, "result": "pong", "duration_ms": 1922, "num_turns": 1, "total_cost_usd": 0.0001976, "usage": {"input_tokens": 2, "cache_creation_input_tokens": 977, "cache_read_input_tokens": 0, "output_tokens": 4}}

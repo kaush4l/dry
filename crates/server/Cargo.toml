@@ -1,0 +1,23 @@
+# The server: serves the web side over HTTP. Every route of the app as HTML,
+# rendered from the same page files and core view models the GPUI window
+# draws, with live updates over SSE (`/events`). Read-only for now: see
+# docs/web.md.
+[package]
+name = "dry-server"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+dry-core = { workspace = true }
+dry-tools = { workspace = true }
+# The renderer (every route and component as HTML, the CSS), shared with the browser build.
+dry-html = { workspace = true }
+actix-web = { workspace = true }
+serde_json = { workspace = true }
+# The SSE body is a stream (`stream::unfold`); already in Cargo.lock under actix.
+futures-util = { version = "0.3", default-features = false }
+
+
+[dev-dependencies]
+# Only its source hash, to check assets/scene.wasm is current (files.rs).
+dry-scene = { path = "../scene" }
