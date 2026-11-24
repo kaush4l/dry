@@ -20,6 +20,11 @@
 //! and its `new` one in a `~~~` block. A text line that itself starts with
 //! `~~~` gets a `\` in front.
 //!
+//! A file is made the same way: `edit` with only `new` (no `old`) on a
+//! path that is not there yet, or holds nothing, keeps the whole text as
+//! an unsaved edit with an empty `old`; `save` writes it. A file that
+//! holds text is never replaced whole.
+//!
 //! The tools change only the state, and their results are short
 //! (`opened turn.rs (412 lines)`); the content is in the snapshot, read
 //! from disk at every render, with the unsaved edits laid over it and
@@ -161,6 +166,22 @@ impl State {
         self.edits.iter().filter(|e| e.path == path).collect()
     }
 
+    /// Room for one more open file: at `MAX_OPEN` the oldest one without
+    /// unsaved edits is closed (its path comes back); with none to close,
+    /// why not.
+    fn make_room(&mut self) -> Result<Option<String>, String> {
+        let mut closed = None;
+        if self.open.len() >= MAX_OPEN
+            && let Some(i) = self.open.iter().position(|o| !self.edits.iter().any(|e| e.path == o.path))
+        {
+            closed = Some(self.open.remove(i).path);
+        }
+        if self.open.len() >= MAX_OPEN {
+            return Err(format!("{MAX_OPEN} files are open, each with unsaved edits: save one first"));
+        }
+        Ok(closed)
+    }
+
     /// The open files as paths from the repo, in the order opened: the
     /// tabs a workbench shows for this artifact. Empty for a root outside
     /// the repo (an absolute one), which the workbench cannot show.
@@ -274,6 +295,21 @@ fn read_text(host: &dyn Host, root: &str, path: &str) -> Result<String, String> 
     }
 }
 
+/// Whether `edits` start a file from nothing: the first has no old text
+/// (`edit` with only `new`).
+pub fn makes_new(edits: &[&Edit]) -> bool {
+    edits.first().is_some_and(|e| e.old.is_empty())
+}
+
+/// `read_text`, where a file that is not on disk reads as empty when it
+/// is being made (`new`): a new file's text is its edits alone.
+fn text_or_new(host: &dyn Host, root: &str, path: &str, new: bool) -> Result<String, String> {
+    match host.read(root, path) {
+        Content::Missing(_) if new => Ok(String::new()),
+        _ => read_text(host, root, path),
+    }
+}
+
 /// Run one of the file tools on the artifact's `text` (its state), which
 /// changes only when the call works. The result is one short line.
 pub fn call(text: &mut String, call: &Call, host: &dyn Host) -> Result<String, String> {
@@ -328,14 +364,7 @@ pub fn call(text: &mut String, call: &Call, host: &dyn Host) -> Result<String, S
             match s.open.iter_mut().find(|o| o.path == path) {
                 Some(o) => o.focus = focus.or(if call.name == "open" { None } else { o.focus }),
                 None => {
-                    if s.open.len() >= MAX_OPEN
-                        && let Some(i) = s.open.iter().position(|o| !s.edits.iter().any(|e| e.path == o.path))
-                    {
-                        closed = Some(s.open.remove(i).path);
-                    }
-                    if s.open.len() >= MAX_OPEN {
-                        return Err(format!("{MAX_OPEN} files are open, each with unsaved edits: save one first"));
-                    }
+                    closed = s.make_room()?;
                     s.open.push(Open { path: path.clone(), focus });
                 }
             }
@@ -349,15 +378,36 @@ pub fn call(text: &mut String, call: &Call, host: &dyn Host) -> Result<String, S
                 None => what,
             }
         }
+        // No old text: the new text is the whole of a file that is not
+        // there yet (or holds nothing). This is how a file is made: no
+        // tool of its own, and never over text that is already there.
+        "edit" if call.arg("old").is_none_or(str::is_empty) => {
+            let new = call.arg("new").unwrap_or("").to_string();
+            if new.is_empty() {
+                return Err("`edit` needs old=\"...\" (the text to replace) and new=\"...\"; for a new file, only new=\"...\" with its whole text".into());
+            }
+            let edits = s.edits_of(&path);
+            let disk = text_or_new(host, &s.root, &path, edits.is_empty() || makes_new(&edits))?;
+            let now = apply(&disk, &edits).map_err(|n| stale(&path, n))?.0;
+            if !now.trim().is_empty() {
+                return Err(format!(
+                    "{path} already holds text, so `edit` needs old=\"...\": the text to replace, exactly as it is in the file (only a new or empty file takes a whole text)"
+                ));
+            }
+            if !s.is_open(&path) {
+                s.make_room()?;
+                s.open.push(Open { path: path.clone(), focus: None });
+            }
+            let size = lines_of(&new);
+            s.edits.push(Edit { path: path.clone(), old: String::new(), new });
+            format!("new file {path} ({size}, unsaved; save(path=\"{path}\") writes it)")
+        }
         "edit" => {
             if !s.is_open(&path) {
                 return Err(format!("{path} is not open: open(path=\"{path}\") first"));
             }
             let (old, new) = (need("old")?, call.arg("new").unwrap_or("").to_string());
-            if old.is_empty() {
-                return Err("`edit` needs the old text to replace, exactly as it is in the file".into());
-            }
-            let disk = read_text(host, &s.root, &path)?;
+            let disk = text_or_new(host, &s.root, &path, makes_new(&s.edits_of(&path)))?;
             let (now, _) = apply(&disk, &s.edits_of(&path)).map_err(|n| stale(&path, n))?;
             match now.matches(&old).count() {
                 0 => return Err(format!("the old text is not in {path} (with its unsaved edits): copy it exactly from the snapshot")),
@@ -374,7 +424,7 @@ pub fn call(text: &mut String, call: &Call, host: &dyn Host) -> Result<String, S
                 return Err(format!("no unsaved edits in {path}"));
             }
             let n = edits.len();
-            let disk = read_text(host, &s.root, &path)?;
+            let disk = text_or_new(host, &s.root, &path, makes_new(&edits))?;
             match apply(&disk, &edits) {
                 Ok((new, _)) => {
                     host.write(&s.root, &path, &new)?;
@@ -424,7 +474,7 @@ pub fn snapshot(text: &str, host: &dyn Host) -> String {
         Err(why) => out.push_str(&format!("root: {} — cannot be listed: {why}\n", s.root)),
     }
     if s.open.is_empty() {
-        out.push_str("\nNo files open: open(path=\"...\") shows one here.");
+        out.push_str("\nNo files open: open(path=\"...\") shows one here; edit(path=\"...\", new=\"...\") makes a new one.");
         return out;
     }
     for o in &s.open {
@@ -445,6 +495,8 @@ pub fn snapshot(text: &str, host: &dyn Host) -> String {
                 out.push_str(&format!("#### {} — too large to show ({} KB)\n", o.path, b / 1000));
                 continue;
             }
+            // A file being made: not on disk until it is saved.
+            Content::Missing(_) if makes_new(&edits) => String::new(),
             Content::Missing(why) => {
                 out.push_str(&format!("#### {} — not readable now: {why}{unsaved}\n", o.path));
                 continue;
@@ -605,6 +657,34 @@ pub(crate) mod tests {
     }
 
     #[test]
+    fn an_edit_with_no_old_text_makes_a_new_file_and_never_replaces_one_that_holds_text() {
+        let disk = FakeDisk::with(&[("README.md", "# hi\n"), ("empty.txt", "")]);
+        let mut text = "kind: file\nroot: .".to_string();
+        // A new file: not opened first, its whole text in `new`, unsaved until save.
+        assert_eq!(
+            call(&mut text, &c("edit(path=\"src/tree.py\", new=\"n = 3\nprint(n)\n\")"), &disk),
+            Ok("new file src/tree.py (2 lines, unsaved; save(path=\"src/tree.py\") writes it)".into())
+        );
+        assert!(!disk.files.borrow().contains_key("src/tree.py"), "unsaved: nothing on disk yet");
+        let snap = snapshot(&text, &disk);
+        assert!(snap.contains("#### src/tree.py — 2 lines, 1 unsaved edit (lines marked *)\n    1* n = 3\n    2* print(n)"), "{snap}");
+        // It reads back from its saved state, and a later edit lays over it.
+        assert_eq!(State::parse(&text).unwrap().edits[0], Edit { path: "src/tree.py".into(), old: String::new(), new: "n = 3\nprint(n)\n".into() });
+        call(&mut text, &c("edit(path=\"src/tree.py\", old=\"n = 3\", new=\"n = 4\")"), &disk).unwrap();
+        assert_eq!(call(&mut text, &c("save(path=\"src/tree.py\")"), &disk), Ok("saved src/tree.py (2 edits, 2 lines)".into()));
+        assert_eq!(disk.files.borrow()["src/tree.py"], "n = 4\nprint(n)\n");
+        // An empty file takes a whole text too; one that holds text never does.
+        assert!(call(&mut text, &c("edit(path=\"empty.txt\", new=\"x\")"), &disk).unwrap().starts_with("new file empty.txt (1 line"));
+        let why = call(&mut text, &c("edit(path=\"README.md\", new=\"gone\")"), &disk).unwrap_err();
+        assert!(why.contains("README.md already holds text") && why.contains("old=\"...\""), "{why}");
+        let why = call(&mut text, &c("edit(path=\"src/tree.py\", new=\"again\")"), &disk).unwrap_err();
+        assert!(why.contains("already holds text"), "{why}");
+        assert!(call(&mut text, &c("edit(path=\"x.py\")"), &disk).unwrap_err().contains("for a new file, only new="));
+        // A file that is gone and was never being made still says so.
+        assert!(call(&mut text, &c("save(path=\"x.py\")"), &disk).unwrap_err().contains("no unsaved edits"));
+    }
+
+    #[test]
     fn a_stale_edit_is_dropped_at_save_and_never_blocks() {
         let disk = FakeDisk::with(&[("a.txt", "one\n")]);
         let mut text = "kind: file\nroot: .".to_string();
@@ -633,7 +713,7 @@ pub(crate) mod tests {
     fn the_snapshot_lists_marks_numbers_and_focuses() {
         let disk = FakeDisk::with(&[("a.rs", "l1\nl2\nl3\nl4\n"), ("b.rs", "x\n"), (".env", "KEY=1"), ("pic.png", "\0")]);
         let mut text = "kind: file\nroot: .".to_string();
-        assert!(snapshot(&text, &disk).ends_with("No files open: open(path=\"...\") shows one here."));
+        assert!(snapshot(&text, &disk).ends_with("No files open: open(path=\"...\") shows one here; edit(path=\"...\", new=\"...\") makes a new one."));
         call(&mut text, &c("focus(path=\"a.rs\", from=2, to=3)"), &disk).unwrap();
         call(&mut text, &c("open(path=\"pic.png\")"), &disk).unwrap();
         call(&mut text, &c("edit(path=\"a.rs\", old=\"l2\", new=\"L2\")"), &disk).unwrap();

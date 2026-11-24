@@ -88,6 +88,71 @@ impl ServedModel {
     }
 }
 
+/// The kinds a server names that do not answer a chat (LM Studio's
+/// `embeddings`; oMLX's document converter, rerankers and speech models).
+const NOT_CHAT: [&str; 8] = ["embeddings", "embedding", "markitdown", "reranker", "rerank", "tts", "stt", "asr"];
+
+impl ServedModel {
+    /// Whether it answers a chat: anything but an embeddings model (its
+    /// type says so; where no endpoint gave a type, its id does).
+    pub fn chats(&self) -> bool {
+        match self.kind.as_deref() {
+            Some(kind) => !NOT_CHAT.contains(&kind),
+            None => !self.id.to_lowercase().contains("embed"),
+        }
+    }
+}
+
+/// The models in the order a picker lists them: the loaded ones that
+/// chat, the other ones that chat, then the rest (embeddings).
+pub fn ordered(models: &[ServedModel]) -> Vec<&ServedModel> {
+    let rank = |m: &ServedModel| match (m.chats(), m.loaded == Some(true)) {
+        (true, true) => 0,
+        (true, false) => 1,
+        (false, _) => 2,
+    };
+    let mut out: Vec<&ServedModel> = models.iter().collect();
+    out.sort_by_key(|m| rank(m));
+    out
+}
+
+/// oMLX's `GET {base}/models/status`: which models are loaded, their kind
+/// and the window each takes (`{"models":[{"id","loaded","model_type",
+/// "max_context_window"}]}`).
+pub fn parse_omlx_status(body: &str) -> Result<Vec<ServedModel>, String> {
+    let v = json(body)?;
+    let models = v.get("models").and_then(Value::as_array).ok_or("no models list")?;
+    Ok(models
+        .iter()
+        .filter_map(|m| {
+            Some(ServedModel {
+                id: text(m, "id")?,
+                kind: text(m, "model_type"),
+                loaded: m.get("loaded").and_then(Value::as_bool),
+                max_context: m.get("max_context_window").and_then(Value::as_u64),
+                ..ServedModel::default()
+            })
+        })
+        .collect())
+}
+
+/// Of several servers' models, the server to use when none is chosen:
+/// the first that has a loaded model that chats, else the first that has
+/// one that chats at all. A model already in memory answers now; one that
+/// is only on disk may not load (or may load with a window too small).
+pub fn first_server<'a, T>(servers: &'a [(T, Vec<ServedModel>)]) -> Option<&'a (T, Vec<ServedModel>)> {
+    let loaded = |models: &[ServedModel]| models.iter().any(|m| m.chats() && m.loaded == Some(true));
+    servers.iter().find(|(_, m)| loaded(m)).or_else(|| servers.iter().find(|(_, m)| first_choice(m).is_some()))
+}
+
+/// The model to use when none is chosen yet: the first loaded one that
+/// chats, else the first that chats (a server that loads on demand, as LM
+/// Studio does, loads it at the first call). Never an embeddings model:
+/// an engine pointed at one only gets errors.
+pub fn first_choice(models: &[ServedModel]) -> Option<&ServedModel> {
+    ordered(models).into_iter().find(|m| m.chats())
+}
+
 fn human_bytes(n: u64) -> String {
     let gb = n as f64 / 1e9;
     if gb >= 1.0 { format!("{gb:.1} GB") } else { format!("{:.0} MB", n as f64 / 1e6) }
@@ -115,13 +180,23 @@ fn texts(v: &Value, key: &str) -> Option<Vec<String>> {
     v.get(key).and_then(Value::as_array).map(|a| a.iter().filter_map(Value::as_str).map(str::to_string).collect())
 }
 
-/// `GET {base}/models`: `{"data":[{"id", "owned_by"}]}`.
+/// `GET {base}/models`: `{"data":[{"id", "owned_by"}]}`, and where a
+/// server adds them (oMLX, vLLM) the model's kind (`model_type`) and the
+/// most it takes (`max_model_len`).
 pub fn parse_openai(body: &str) -> Result<Vec<ServedModel>, String> {
     let v = json(body)?;
     let data = v.get("data").and_then(Value::as_array).ok_or("no data list")?;
     Ok(data
         .iter()
-        .filter_map(|m| Some(ServedModel { id: text(m, "id")?, publisher: text(m, "owned_by"), ..ServedModel::default() }))
+        .filter_map(|m| {
+            Some(ServedModel {
+                id: text(m, "id")?,
+                publisher: text(m, "owned_by"),
+                kind: text(m, "model_type"),
+                max_context: m.get("max_model_len").and_then(Value::as_u64),
+                ..ServedModel::default()
+            })
+        })
         .collect())
 }
 
@@ -222,6 +297,34 @@ pub fn merge(base: Vec<ServedModel>, extra: Vec<ServedModel>) -> Vec<ServedModel
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_first_choice_is_a_loaded_model_that_chats_and_never_an_embeddings_model() {
+        let m = |id: &str, kind: Option<&str>, loaded: Option<bool>| ServedModel { id: id.into(), kind: kind.map(str::to_string), loaded, ..ServedModel::default() };
+        let ids = |list: Vec<&ServedModel>| list.into_iter().map(|m| m.id.clone()).collect::<Vec<_>>();
+        // As LM Studio lists them: the embeddings model first, nothing loaded.
+        let models = vec![m("text-embedding-nomic", Some("embeddings"), Some(false)), m("inkling", Some("vlm"), Some(false)), m("qwen", Some("llm"), Some(true))];
+        assert_eq!(first_choice(&models).map(|m| m.id.as_str()), Some("qwen"), "the loaded one");
+        assert_eq!(ids(ordered(&models)), ["qwen", "inkling", "text-embedding-nomic"]);
+        assert_eq!(first_choice(&models[..2]).map(|m| m.id.as_str()), Some("inkling"), "none loaded: the first that chats");
+        assert_eq!(first_choice(&models[..1]), None, "only embeddings: none");
+        // Of two servers, the one with the model in memory, whatever their order (as on
+        // the owner's Mac: LM Studio lists Inkling unloaded, oMLX has it loaded).
+        let lm = vec![m("inkling-2-mini-oq4e-mtp", Some("vlm"), Some(false)), m("text-embedding-nomic", Some("embeddings"), Some(false))];
+        let omlx = parse_omlx_status(r#"{"models":[{"id":"Inkling-2-Mini-oQ4e-mtp","loaded":true,"model_type":"vlm","max_context_window":1048576},{"id":"MarkItDown","loaded":true,"model_type":"markitdown","max_context_window":null}]}"#).unwrap();
+        assert_eq!(omlx[0].max_context, Some(1_048_576));
+        assert_eq!(first_choice(&omlx[1..]), None, "a document converter is not a chat model");
+        let servers = vec![("lmstudio", lm.clone()), ("omlx", omlx)];
+        assert_eq!(first_server(&servers).map(|s| s.0), Some("omlx"));
+        assert_eq!(first_server(&servers[..1]).map(|s| s.0), Some("lmstudio"), "none loaded anywhere: the first that has one");
+        assert_eq!(first_server(&[("only", vec![m("e", Some("embeddings"), None)])]), None);
+        // What a server puts in its list is read: oMLX's kind and length.
+        let listed = parse_openai(r#"{"data":[{"id":"Inkling-2-Mini-oQ4e-mtp","owned_by":"omlx","model_type":"vlm","max_model_len":1048576}]}"#).unwrap();
+        assert_eq!((listed[0].kind.as_deref(), listed[0].max_context), (Some("vlm"), Some(1_048_576)));
+        // A server that gives ids only: the id is all there is to go by.
+        let bare = vec![m("nomic-embed", None, None), m("qwen3-8b", None, None)];
+        assert_eq!(first_choice(&bare).map(|m| m.id.as_str()), Some("qwen3-8b"));
+    }
 
     /// As LM Studio answered on this machine (2026-11-22), trimmed.
     const LMSTUDIO: &str = r#"{"data":[

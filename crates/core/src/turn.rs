@@ -23,6 +23,13 @@
 //! shell sends again on `Again`, until a reply: there is no step limit
 //! (a stuck loop is handled another way, not by counting).
 //!
+//! **A reply is never sent beside a call that waits** (`run`, an outside
+//! tool): it would be a report written before the result it reports. The
+//! waiting calls run, the reply is held back with a line that says why,
+//! and the model replies in its next step, having read the results. Work
+//! that calls back (`start`, `engine_start`) may share an act with a
+//! reply: nothing is claimed about it yet.
+//!
 //! The tools a step may call are the engine's own plus those its live
 //! artifacts bring (`live::toolbox`). A `script(...)` call runs here: its
 //! steps go through the same tools (never `reply` or `script`), in order,
@@ -213,7 +220,21 @@ pub(crate) fn act_step(e: &mut Engine, text: &str, external: &mut External, host
         return out;
     }
     let line = |s: String| Slot::Line(s);
-    match e.format.parse(&e.response, text) {
+    // An answer whose calls read but which left another field out (the
+    // thought) still acts: refusing it would cost a whole step to hear
+    // the same calls again. What was missing is said after the results.
+    let mut left_out = None;
+    let read = e.format.parse(&e.response, text).or_else(|why| {
+        let calls_only = Responses { fields: e.response.fields.iter().filter(|f| f.key == ACT).cloned().collect() };
+        match e.format.parse(&calls_only, text) {
+            Ok(answer) if !calls_only.fields.is_empty() => {
+                left_out = Some(why.clone());
+                Ok(answer)
+            }
+            _ => Err(why),
+        }
+    });
+    match read {
         Err(why) => out.slots.push(line(format!(
             "Your answer did not follow the response contract ({why}). Answer again, written as the Response section says."
         ))),
@@ -254,12 +275,28 @@ pub(crate) fn act_step(e: &mut Engine, text: &str, external: &mut External, host
                         Err(why) => out.slots.push(line(format!("{call} → error: {why}"))),
                     }
                 }
+                // A reply beside a call that waits was written before that
+                // call's result, so it cannot be a report of it: it is not
+                // sent, the waiting calls still run, and the model reads
+                // their results and replies in its next step.
+                let mut held = None;
+                if !later.is_empty() && out.reply.take().is_some() {
+                    let mut names: Vec<&str> = later.iter().map(|(_, c, _)| c.name.as_str()).collect();
+                    names.dedup();
+                    held = Some(format!(
+                        "reply(...) → not sent: this act also calls {}, and a reply written beside it cannot have read its result. The result is above: read it, then reply in a step of its own.",
+                        names.join(", ")
+                    ));
+                }
                 // Then the waiting ones are prepared, after every instant one.
                 // A call to an outside capability's tool is checked first
                 // (its inputs, an actuator's approval), then goes outside.
                 for (slot, call, run) in later {
                     let wait = if run {
                         live::prepare(e, call, host).map(Wait::Run)
+                    } else if let Some(as_run) = crate::skilltool::as_run(e, call) {
+                        // A loaded skill's own tool: its command, run in the terminal.
+                        as_run.and_then(|run| live::prepare(e, &run, host)).map(Wait::Run)
                     } else {
                         crate::capability::check(e, call).unwrap_or(Ok(())).map(|()| Wait::Outside(call.clone()))
                     };
@@ -271,6 +308,9 @@ pub(crate) fn act_step(e: &mut Engine, text: &str, external: &mut External, host
                         Err(why) => line(format!("{call} → error: {why}")),
                     };
                 }
+                // Last, so it is read after the results it points at.
+                out.slots.extend(held.map(line));
+                out.slots.extend(left_out.map(|why| line(format!("(Your calls ran, but {why}: write every field of the Response section next time.)"))));
             }
         },
     }
@@ -350,9 +390,10 @@ pub fn finish_step(e: &mut Engine, pending: Pending, came: Vec<Came>) -> Step {
 /// waits for (`engine_call`: their replies fill the step's lines, and
 /// `resumed` says the turn goes on), else the work that calls back
 /// (`engine_start` children that replied, terminal `start` sessions that
-/// ended, and the jobs a `start(..., wait="yes")` waits on, once the last
-/// has ended), as `wake`: one message, a new turn that keeps the phase
-/// (`State::add_wake`). `busy`: a turn is running,
+/// ended, the jobs a `start(..., wait="yes")` waits on, once the last
+/// has ended, a guided post, an alert of its own that is due), as `wake`:
+/// one message, a new turn that keeps the phase (`State::add_wake`).
+/// `busy`: a turn is running,
 /// so nothing is taken now; everything stays where it is and comes,
 /// together, the first time the engine is free.
 pub fn callbacks(state: &mut crate::state::State, i: usize, busy: bool, host: &dyn live::Host, seen: &dyn Fn(usize) -> crate::engines::Seen) -> crate::engines::Settled {
@@ -373,6 +414,16 @@ pub fn callbacks(state: &mut crate::state::State, i: usize, busy: bool, host: &d
         out.wake.extend(crate::terminal::settle_engine(&mut state.engines[i], host));
         // A guided post on its thread calls it (`crate::desk`).
         out.wake.extend(crate::desk::guided(state, i));
+        // An alert of its own that is due (`crate::alert`): the one way an
+        // engine starts work with nobody writing to it.
+        // An `idle` one asks whether anyone on its thread works now.
+        if !state.engines[i].alerts.is_empty() || !state.engines[i].alert_marks.is_empty() {
+            let root = crate::shared::root_of(state, &state.engines[i].id);
+            let working = crate::shared::members(state, &root).into_iter().any(|j| j != i && seen(j).busy);
+            let e = &mut state.engines[i];
+            let look = crate::alert::Look { working, messages: e.messages.len(), artifacts: Some(&e.artifacts) };
+            out.wake.extend(crate::alert::settle_with(&mut e.alerts, &mut e.alert_marks, host.clock(), &look));
+        }
     }
     out
 }
@@ -396,7 +447,7 @@ pub(crate) fn run_call(
         if !e.loaded_skills.iter().any(|l| l == name) {
             e.loaded_skills.push(name.to_string());
         }
-        return Ok(Outcome::Result(skill.loaded()));
+        return Ok(Outcome::Result(format!("{}{}", skill.loaded(), crate::skilltool::loaded(e, name))));
     }
     if call.name == crate::skill::SAVE && toolbox.iter().any(|t| t == crate::skill::SAVE) {
         let need = |key: &str| call.arg(key).map(str::to_string).ok_or_else(|| format!("`skill_save` needs {key}=\"...\""));
@@ -494,6 +545,34 @@ mod tests {
         assert_eq!(s, Step::Reply("Saved the plan.".into()));
         assert_eq!(e.messages.last().unwrap().role, Role::Assistant);
         assert_eq!(reply_in(&e, &e.messages.last().unwrap().text).as_deref(), Some("Saved the plan."));
+    }
+
+    #[test]
+    fn the_contract_is_read_last_at_every_step() {
+        let mut e = engine();
+        let last = |e: &Engine| crate::prompt::render(e).messages().last().unwrap().text.clone();
+        let count = |e: &Engine| crate::prompt::render(e).messages().iter().filter(|m| m.text.contains("## Response")).count();
+        assert!(last(&e).starts_with("save a plan, then tell me\n\n## Response\n\n"), "after your text");
+        // After a step it follows the results, and it is sent once.
+        step(&mut e, "thought: save it first\nact: write(name=\"plan\", text=\"1. read\")", &mut |_| None);
+        assert!(last(&e).starts_with("write(name=\"plan\", text=\"1. read\") → saved plan"), "{}", last(&e));
+        assert!(last(&e).contains("\n\n## Response\n\n") && last(&e).trim_end().ends_with("act: ..."), "{}", last(&e));
+        assert_eq!(count(&e), 1);
+    }
+
+    #[test]
+    fn calls_with_no_thought_still_run_and_the_missing_field_is_said() {
+        let mut e = engine();
+        assert_eq!(step(&mut e, "act: write(name=\"plan\", text=\"1. read\")", &mut |_| None), Step::Again);
+        assert_eq!(e.artifacts["plan"], "1. read", "the call ran");
+        let out = e.messages.last().unwrap().text.clone();
+        assert!(out.starts_with("write(name=\"plan\", text=\"1. read\") → saved plan"), "{out}");
+        assert!(out.ends_with("(Your calls ran, but the answer has no thought: write every field of the Response section next time.)"), "{out}");
+        // A reply written that way is sent: the turn ends.
+        assert_eq!(step(&mut e, "act: reply(text=\"Saved.\")", &mut |_| None), Step::Reply("Saved.".into()));
+        // A thought with no calls is still refused: there is nothing to run.
+        step(&mut e, "thought: next I will read it", &mut |_| None);
+        assert!(e.messages.last().unwrap().text.contains("did not follow the response contract (the answer has no act)"));
     }
 
     #[test]
@@ -855,6 +934,117 @@ mod tests {
         state.engines[1].waiting = vec!["term#7".into()];
         assert_eq!(calls_back(&mut state, 1, &sh).wake, ["session 7 is gone from terminal term: its result is not known"]);
         assert!(state.engines[1].waiting.is_empty());
+    }
+
+    #[test]
+    fn a_reply_beside_a_call_that_waits_is_held_back_until_its_result_is_read() {
+        let sh = crate::terminal::tests::FakeShell::default();
+        let mut e = engine();
+        e.id = "e".into();
+        e.artifacts.insert("term".into(), "kind: terminal\nroot: .".into());
+        // The report was written before the run it reports: the run still
+        // runs, the reply is not sent, and the turn goes on.
+        let s = step_with(&mut e, "thought: done\nact: run(command=\"cargo check\"); reply(text=\"It compiles.\")", &mut |_| None, &sh);
+        assert_eq!(s, Step::Again);
+        let out = e.messages.last().unwrap().text.clone();
+        assert!(out.starts_with("run(command=\"cargo check\") → session 1 `cargo check`: exit 0"), "{out}");
+        assert!(out.ends_with("reply(...) → not sent: this act also calls run, and a reply written beside it cannot have read its result. The result is above: read it, then reply in a step of its own."), "{out}");
+        // In a step of its own it is sent.
+        assert_eq!(step_with(&mut e, "thought: read it\nact: reply(text=\"It compiles: exit 0.\")", &mut |_| None, &sh), Step::Reply("It compiles: exit 0.".into()));
+        // Work that calls back claims nothing yet, so a reply may go with it.
+        let s = step_with(&mut e, "thought: long\nact: start(command=\"cargo test\"); reply(text=\"Tests are running.\")", &mut |_| None, &sh);
+        assert_eq!(s, Step::Reply("Tests are running.".into()));
+    }
+
+    #[test]
+    fn a_loaded_skills_own_tool_runs_in_the_terminal_and_is_gone_with_the_skill() {
+        let sh = crate::terminal::tests::FakeShell::default();
+        let mut state = crate::state::State { engines: vec![engine()], ..Default::default() };
+        let e = &mut state.engines[0];
+        e.id = "e".into();
+        e.artifacts.insert("term".into(), "kind: terminal\nroot: .".into());
+        e.skills.insert("python".into(), "---\nname: python\ndescription: Python files.\n---\nCheck before you run.\n".into());
+        e.skill_tools.insert("python".into(), "# python\nPython.\n\n## tool: check\nCompile one file.\ncommand: [\"python3\", \"-m\", \"py_compile\", \"{file}\"]\ninputs:\n- file (string, required): the file\n".into());
+        // Not loaded: the call is no tool of the engine's.
+        step_with(e, "thought: check\nact: python.check(file=\"tree.py\")", &mut |_| None, &sh);
+        assert!(e.messages.last().unwrap().text.contains("error: no tool `python.check`"), "{}", e.messages.last().unwrap().text);
+        // Loading the skill says what it brings, and lists it with the tools.
+        step_with(e, "thought: load\nact: skill(name=\"python\")", &mut |_| None, &sh);
+        let loaded = e.messages.last().unwrap().text.clone();
+        assert!(loaded.contains("Check before you run.") && loaded.contains("- python.check(file=\"...\"): Compile one file."), "{loaded}");
+        assert!(sent(e, &sh).contains("\n- python.check(file=\"...\"): Compile one file. (file: string, required, the file)"));
+        // The call is a run of the terminal: a session, an exit code, the last lines.
+        step_with(e, "thought: check\nact: python.check(file=\"my tree.py\")", &mut |_| None, &sh);
+        let out = e.messages.last().unwrap().text.clone();
+        assert!(out.starts_with("python.check(file=\"my tree.py\") → session 1 `'python3' '-m' 'py_compile' 'my tree.py'`: exit 0"), "{out}");
+        assert!(e.artifacts["term"].contains("'python3' '-m' 'py_compile' 'my tree.py'"), "the session is in the terminal artifact");
+        // A missing input is refused before anything runs.
+        step_with(e, "thought: again\nact: python.check()", &mut |_| None, &sh);
+        assert!(e.messages.last().unwrap().text.contains("python.check() → error:"), "{}", e.messages.last().unwrap().text);
+        // The next message unloads the skill: the tool is gone.
+        assert!(state.add_text(0, "thanks"));
+        let e = &mut state.engines[0];
+        assert!(!sent(e, &sh).contains("python.check("));
+    }
+
+    /// A host with nothing but a clock.
+    struct At(std::cell::Cell<i64>);
+
+    impl live::Host for At {
+        fn now(&self) -> i64 {
+            self.0.get()
+        }
+        fn list(&self, a: &str, b: usize) -> Result<Vec<String>, String> {
+            NoHost.list(a, b)
+        }
+        fn read(&self, a: &str, b: &str) -> live::Content {
+            NoHost.read(a, b)
+        }
+        fn write(&self, a: &str, b: &str, c: &str) -> Result<(), String> {
+            NoHost.write(a, b, c)
+        }
+        fn run(&self, j: &live::Job) -> Result<Option<i32>, String> {
+            NoHost.run(j)
+        }
+        fn spawn(&self, j: &live::Job) -> Result<(), String> {
+            NoHost.spawn(j)
+        }
+        fn status(&self, j: &live::Job) -> live::Proc {
+            NoHost.status(j)
+        }
+        fn tail(&self, j: &live::Job, n: usize) -> String {
+            NoHost.tail(j, n)
+        }
+    }
+
+    #[test]
+    fn an_engine_sets_its_own_alert_and_is_woken_by_it_with_nobody_writing() {
+        let host = At(std::cell::Cell::new(1_795_356_330));
+        let mut state = crate::state::State { engines: vec![engine()], ..Default::default() };
+        state.engines[0].id = "e".into();
+        state.engines[0].artifacts.insert("alerts".into(), "kind: alerts".into());
+        let idle = |_: usize| crate::engines::Seen::default();
+        // The tool is the artifact's: it is in the prompt, and the engine sets its next look.
+        assert!(sent(&state.engines[0], &host).contains("- alert(name=\"...\", trigger=\"...\", text=\"...\", once=\"...\", while=\"...\"): Make an alert"));
+        let e = &mut state.engines[0];
+        step_with(e, "thought: look again later\nact: alert(name=\"check\", trigger=\"every 1m\", text=\"Run the tests again.\")", &mut |_| None, &host);
+        assert!(e.messages.last().unwrap().text.contains("→ made alert check: every 1m."), "{}", e.messages.last().unwrap().text);
+        assert_eq!(step_with(e, "thought: done for now\nact: reply(text=\"I will look again in a minute.\")", &mut |_| None, &host), Step::Reply("I will look again in a minute.".into()));
+        assert!(sent(e, &host).contains("- check (every 1m): Run the tests again. · not fired yet"));
+        // Nothing yet; in a turn it is not looked at; a minute on, free, it wakes: one message, a new turn.
+        assert!(callbacks(&mut state, 0, false, &host, &idle).wake.is_empty());
+        host.0.set(host.0.get() + 61);
+        assert!(callbacks(&mut state, 0, true, &host, &idle).wake.is_empty(), "busy: not now");
+        let woke = callbacks(&mut state, 0, false, &host, &idle).wake;
+        assert_eq!(woke, ["Alert check fired (every 1m): Run the tests again."]);
+        assert!(state.add_text(0, &woke.join("\n")));
+        assert_eq!(state.engines[0].messages.last().unwrap().text, "Alert check fired (every 1m): Run the tests again.");
+        assert!(callbacks(&mut state, 0, false, &host, &idle).wake.is_empty(), "it fires once for a moment");
+        // The mark survives a save and a load, so a restart does not fire the same moment again.
+        let files = crate::files::to_files(&state.engines[0]);
+        let back = crate::files::from_files("e", &files).unwrap();
+        assert_eq!(back.alert_marks, state.engines[0].alert_marks);
+        assert_eq!(back.alert_marks["check"].fired, 1);
     }
 
     #[test]

@@ -75,6 +75,17 @@ pub const BROUGHT: &[ToolSpec] = &[
         ],
     },
     ToolSpec {
+        name: "alert",
+        description: "Make an alert: it wakes you later with its text, with nobody writing to you. One of the same name is replaced; text=\"\" removes it. It never fires at the moment it is made.",
+        args: &[
+            ("name", "lower case, - and _"),
+            ("trigger", "`at 09:35`, `at 09:35 weekdays`, `at 2026-11-24 09:35`, `every 30m`, or `idle 5m`: nobody on your thread has worked for that long (m, h or d; at least 1m)"),
+            ("text", "what you are told when it fires: what to look at or do then"),
+            ("once", "optional: true to fire one time only"),
+            ("while", "optional: an artifact's name; it fires only while that artifact holds an open `- [ ]` step"),
+        ],
+    },
+    ToolSpec {
         name: "open",
         description: "Open a file of your file artifact: its text is in the artifact from now on, as it is on disk at every step. Open several at once with `|`: path=\"src/a.rs|src/b.rs\".",
         args: &[("path", "relative to its root")],
@@ -86,8 +97,8 @@ pub const BROUGHT: &[ToolSpec] = &[
     },
     ToolSpec {
         name: "edit",
-        description: "Change an open file: the old text (exactly once in it) becomes the new. Held as unsaved, shown marked *, until save.",
-        args: &[("path", "an open file"), ("old", "the text to replace, exactly"), ("new", "what it becomes")],
+        description: "Change an open file: the old text (exactly once in it) becomes the new. Held as unsaved, shown marked *, until save. To make a new file, give its path and only new (no old, no open first): new is its whole text.",
+        args: &[("path", "an open file, or a new file's path"), ("old", "the text to replace, exactly; left out for a new file"), ("new", "what it becomes")],
     },
     ToolSpec { name: "save", description: "Write a file's unsaved edits to disk.", args: &[("path", "the file")] },
     ToolSpec {

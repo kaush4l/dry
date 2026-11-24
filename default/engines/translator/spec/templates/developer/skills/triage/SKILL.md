@@ -13,8 +13,10 @@ have confirmed, not a guess.
    (a blocker with its file:line and proof), add them to the notes as they
    are and start from them. If the plan artifact holds your plan and the
    message approves it, there is nothing to triage: go to code.
-2. **Lay of the land.** `run(command="git status --short && git log --oneline -5")`
-   and `run(command="ls")`. Find how the project builds and tests itself:
+2. **Lay of the land.** `run(command="ls -la")`, and when there is a
+   `.git` folder `run(command="git status --short && git log --oneline -5")`
+   (where git is not installed, say so in the report and go on). Find how
+   the project builds and tests itself:
    `package.json` scripts, `Cargo.toml`, a `Makefile`, the README. Use only
    commands the project declares. Never invent one.
 3. **Find the entry point.** For the behaviour asked about, find where it

@@ -304,7 +304,7 @@ fn detail(kind: Option<Live>, name: &str, text: &str, e: &Engine, outside: &Snap
         None => Detail::Text(text.to_string()),
         Some(Live::Clock) => Detail::Text(outside.clock.map_or_else(|| "(read when the prompt is sent)".to_string(), |c| c.to_string())),
         Some(Live::Scripts) => Detail::Text(crate::script::snapshot(&e.scripts)),
-        Some(Live::Alerts) => Detail::Text(crate::alert::snapshot(&e.alerts)),
+        Some(Live::Alerts) => Detail::Text(crate::alert::snapshot(&e.alerts, &e.alert_marks)),
         Some(Live::Evidence) => match crate::evidence::artifact::State::parse(text) {
             Err(why) => Detail::Broken(why),
             Ok(s) => Detail::Evidence(evidence_detail(&s, outside.host)),
@@ -405,6 +405,8 @@ fn file_detail(s: &crate::file::State, host: Option<&dyn crate::live::Host>) -> 
                     file.note = Some(format!("too large to show ({} KB)", b / 1000));
                     return file;
                 }
+                // A file being made: its text is its unsaved edits alone.
+                Content::Missing(_) if crate::file::makes_new(&edits) => String::new(),
                 Content::Missing(why) => {
                     file.note = Some(format!("not readable now: {why}"));
                     return file;

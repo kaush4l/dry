@@ -9,8 +9,13 @@
 //!   tools.md                optional: its direct tools, one `- name` line each
 //!                           (without it the child gets its parent's)
 //!   skills/<s>/SKILL.md     the child's skills (`crate::skill`)
+//!   skills/<s>/tools.md     optional: the tools that skill brings (`crate::skilltool`)
 //!   artifacts/<a>.md        the artifacts it starts with: `kind: file`,
 //!                           `uses: [browser]`, a plain `notes` text, ...
+//!   elements.md             optional: the extra elements the child holds
+//!                           (`crate::element::held`), e.g. `environment`,
+//!                           so it reads where its tools run and what is
+//!                           installed there (without it: none)
 //! ```
 //!
 //! `engine_start(name, goal, template="developer", root="/path/to/repo")`
@@ -41,7 +46,11 @@ pub struct Kit {
     /// `tools.md`'s names; `None`: the parent's.
     pub tools: Option<Vec<String>>,
     pub skills: BTreeMap<String, String>,
+    /// `skills/<s>/tools.md`: the tools a skill brings (`crate::skilltool`).
+    pub skill_tools: BTreeMap<String, String>,
     pub artifacts: BTreeMap<String, String>,
+    /// `elements.md` as written; empty: the child holds no extra element.
+    pub elements: String,
 }
 
 impl Kit {
@@ -58,7 +67,8 @@ impl Kit {
         if let Err(why) = crate::template::parse(&self.template).and_then(|t| t.phases().map(|_| ())) {
             return Some(format!("template {}: {why}", self.name));
         }
-        self.skills.iter().find_map(|(n, t)| crate::skill::parse(t).err().map(|why| format!("template {}: skill {n}: {why}", self.name)))
+        let skill = self.skills.iter().find_map(|(n, t)| crate::skill::parse(t).err().map(|why| format!("template {}: skill {n}: {why}", self.name)));
+        skill.or_else(|| self.skill_tools.iter().find_map(|(n, t)| crate::skilltool::parse(n, t).err().map(|why| format!("template {}: {why}", self.name))))
     }
 
     /// Its artifacts with every `root:` line set to `root` (none: as written).
@@ -84,10 +94,13 @@ pub fn kits(e: &Engine) -> BTreeMap<String, Kit> {
         match rest {
             "about.md" => kit.about = text.lines().map(str::trim).find(|l| !l.is_empty() && !l.starts_with('#')).unwrap_or("").to_string(),
             "template.md" => kit.template = text.clone(),
+            "elements.md" => kit.elements = text.clone(),
             "tools.md" => kit.tools = Some(text.lines().filter_map(|l| l.trim().strip_prefix("- ")).map(|t| t.trim().to_string()).collect()),
             _ => {
                 if let Some(skill) = rest.strip_prefix("skills/").and_then(|r| r.strip_suffix("/SKILL.md")) {
                     kit.skills.insert(skill.to_string(), text.clone());
+                } else if let Some(skill) = rest.strip_prefix("skills/").and_then(|r| r.strip_suffix(&format!("/{}", crate::skilltool::FILE))) {
+                    kit.skill_tools.insert(skill.to_string(), text.clone());
                 } else if let Some(a) = rest.strip_prefix("artifacts/").and_then(|r| r.strip_suffix(".md")).filter(|a| !a.contains('/')) {
                     kit.artifacts.insert(a.to_string(), text.clone());
                 }

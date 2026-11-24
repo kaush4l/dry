@@ -501,6 +501,10 @@ impl Host for Shell {
     fn now(&self) -> i64 {
         host::now()
     }
+    /// This browser's wall clock, so an alert's `at 09:35` is the person's 09:35.
+    fn clock(&self) -> Clock {
+        dry_core::live::Time::clock(&host::Browser)
+    }
     fn list(&self, root: &str, max: usize) -> Result<Vec<String>, String> {
         match self {
             Shell::Browser(b) => b.list(root, max),
@@ -580,7 +584,7 @@ async fn call_tool(call: &Call) -> Option<Result<String, String>> {
 
 impl Time for Shell {
     fn clock(&self) -> Clock {
-        Browser.clock()
+        dry_core::live::Time::clock(&Browser)
     }
 }
 

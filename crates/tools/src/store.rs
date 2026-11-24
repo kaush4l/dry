@@ -568,6 +568,11 @@ fn read_spec(dir: &Path) -> Result<BTreeMap<String, String>> {
             if file.is_file() {
                 out.insert(files::skill_file(&entry.file_name().to_string_lossy()), crate::read(&file)?);
             }
+            // The tools it brings of its own (`dry_core::skilltool`).
+            let tools = entry.path().join(dry_core::skilltool::FILE);
+            if tools.is_file() {
+                out.insert(dry_core::skilltool::file(&entry.file_name().to_string_lossy()), crate::read(&tools)?);
+            }
         }
     }
     // Templates (`dry_core::kit`): every `.md` file under `templates/`, at any depth.

@@ -471,7 +471,7 @@ const COMPILED: [Builtin; 12] = [
         writes: &[],
         doc: "your scripts: call sequences you run with one script(...) call",
     },
-    Builtin { id: "alerts", live: Some(Live::Alerts), tools: &[], writes: &[], doc: "your alerts: what wakes you, and when" },
+    Builtin { id: "alerts", live: Some(Live::Alerts), tools: &crate::alert::TOOLS, writes: &[], doc: "your alerts: what wakes you, and when" },
     Builtin {
         id: "file",
         live: Some(Live::File),

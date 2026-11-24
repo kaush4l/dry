@@ -10,9 +10,10 @@ terminal output, the page or evidence, and the saved files.
 1. **Against the ask.** Does the behaviour now match the desired line of the
    plan, exactly? Quote the output or page text that shows it.
 2. **Against the plan.** Every step is ticked (`- [x]`) and was made and
-   saved. Nothing
-   outside it changed: run `git status --short` and `git diff --stat` and
-   compare with the plan's list.
+   saved. Nothing outside it changed: in a git repository run
+   `git status --short` and `git diff --stat` and compare with the plan's
+   list; in a folder that is not one, `ls -la` shows what is there. The
+   files themselves are in your code artifact (open one to read it again).
 3. **Against the code around it.** Same style, no debugging prints left,
    no new warnings in the build output.
 4. **Findings need proof.** A finding counts only if you can point at a

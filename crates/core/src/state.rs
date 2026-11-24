@@ -75,9 +75,15 @@ pub struct Engine {
     /// Its alerts (`spec/alerts/<name>.md`), name → the file's text, read
     /// when used (`crate::alert`) like the scripts.
     pub alerts: BTreeMap<String, String>,
+    /// When each alert was first seen and last fired (`crate::alert::Mark`).
+    /// Kept in `convo/run.md`.
+    pub alert_marks: BTreeMap<String, crate::alert::Mark>,
     /// Its skills (`spec/skills/<name>/SKILL.md`, `crate::skill`), name →
     /// the file's text, read when used.
     pub skills: BTreeMap<String, String>,
+    /// The tools its skills bring of their own (`spec/skills/<name>/tools.md`,
+    /// `crate::skilltool`), skill name → the file's text, read when used.
+    pub skill_tools: BTreeMap<String, String>,
     /// The skills loaded in this run (their tools are its tools until your
     /// next message). Kept in `convo/run.md`.
     pub loaded_skills: Vec<String>,
@@ -137,7 +143,9 @@ impl Engine {
             artifacts: BTreeMap::new(),
             scripts: BTreeMap::new(),
             alerts: BTreeMap::new(),
+            alert_marks: BTreeMap::new(),
             skills: BTreeMap::new(),
+            skill_tools: BTreeMap::new(),
             loaded_skills: Vec::new(),
             template: String::new(),
             templates: BTreeMap::new(),

@@ -12,7 +12,8 @@ Only the declared checks count, run here, now, on the saved files.
    last lines. A long check goes to `start(command="...", wait="yes")`:
    your turn ends with no reply and goes on here when it ends; never reply early to wait.
 2. **Run it.** Use the program the way its user would:
-   - a CLI or library: `run` it with the input from the plan, read the output;
+   - a script, a CLI or a library: `run` it with the input from the plan
+     and with the smallest input, and read every line of the output;
    - a web app: `background` its dev server, wait until it is up
      (`run(command="curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:PORT/")`),
      then browse it if you have a browser artifact (load browser-qa);
@@ -28,6 +29,8 @@ Only the declared checks count, run here, now, on the saved files.
    network: that goes in the report as Unverified, with why.
 5. **Never work around the environment.** A missing tool, a port in use or
    a timeout is reported as what it is. Do not change code to dodge it.
+   A runtime your environment line says can be installed is installed
+   with the command it gives; that is not a workaround.
 
 Then load critique.
 

@@ -29,6 +29,10 @@ impl Time for Browser {
 }
 
 impl Host for Browser {
+    /// The same clock as `Time` gives: this browser's, with its offset.
+    fn clock(&self) -> Clock {
+        Time::clock(self)
+    }
     fn now(&self) -> i64 {
         now()
     }

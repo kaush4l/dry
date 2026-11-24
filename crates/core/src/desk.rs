@@ -141,6 +141,12 @@ pub struct Msg {
     /// The turn it started: the addressee's, or for a bounce the sender's;
     /// `None` when it calls nobody.
     pub work: Option<Turn>,
+    /// The work that followed from it with no post of its own (`follow`):
+    /// the turns of the children its work started, and the addressee's
+    /// later turns that a callback began (a child replied, a command
+    /// ended). So the thread shows a piece of work to its end: the brief,
+    /// the child writing and running, and the report.
+    pub follow: Vec<Turn>,
 }
 
 /// Where a turn is.
@@ -331,7 +337,11 @@ fn thread(state: &State, lives: &[Live], root: &str) -> Thread {
                 _ => None,
             };
             let work = target.and_then(|t| work_on(state, &lives[t], t, n));
-            Msg { n, at: e.at, from: e.author.clone(), to: e.to.clone(), text: e.text.clone(), bounce, lost, work }
+            let follow = match (target, &work) {
+                (Some(t), Some(w)) => follow(state, lives, t, w),
+                _ => Vec::new(),
+            };
+            Msg { n, at: e.at, from: e.author.clone(), to: e.to.clone(), text: e.text.clone(), bounce, lost, work, follow }
         })
         .collect();
     Thread { id: root.to_string(), title: format!("{name}'s thread"), participants, messages, default_to: state.index_of(root).map(|_| root.to_string()) }
@@ -351,6 +361,48 @@ fn work_on(state: &State, live: &Live, t: usize, n: usize) -> Option<Turn> {
             Some(Turn { engine: e.id.clone(), phase, ..Turn::default() })
         }
     }
+}
+
+/// What followed from engine `t`'s turn `first` (a post's work) with no
+/// post of its own, in the order it happened as far as the messages say:
+///
+/// - `t`'s later turns up to its next post: each began by a callback
+///   (`engine dev replied: …`, `session 2 … finished`);
+/// - every turn of each child that `first` or one of those turns started
+///   or messaged (`engine_start`, `engine_call`).
+///
+/// A child's k-th turn is put before the parent's k-th callback turn: the
+/// parent's callback is the child's reply coming back. Children of
+/// children are on their own engine pages, not here.
+fn follow(state: &State, lives: &[Live], t: usize, first: &Turn) -> Vec<Turn> {
+    let Some(start) = first.start else { return Vec::new() };
+    let e = &state.engines[t];
+    let all = turns(e, &lives[t]);
+    let Some(j) = all.iter().position(|x| x.start == Some(start)) else { return Vec::new() };
+    let later: Vec<Turn> = all[j + 1..].iter().take_while(|x| !x.text.starts_with(WAKE_HEAD)).cloned().collect();
+    // The children named in the engines calls of these turns, in order, once each.
+    let mut children: Vec<usize> = Vec::new();
+    for turn in std::iter::once(first).chain(&later) {
+        for item in &turn.items {
+            let Item::Call(c) = item else { continue };
+            if !crate::engines::TOOLS.contains(&c.name.as_str()) {
+                continue;
+            }
+            let named = c.full.split_once("name=\"").and_then(|(_, rest)| rest.split_once('"')).map(|(name, _)| name);
+            let child = named.and_then(|name| state.engines.iter().position(|x| x.parent.as_deref() == Some(e.id.as_str()) && (x.id == name || x.name == name)));
+            if let Some(c) = child.filter(|c| !children.contains(c)) {
+                children.push(c);
+            }
+        }
+    }
+    let theirs: Vec<Vec<Turn>> = children.iter().map(|&c| turns(&state.engines[c], &lives[c])).collect();
+    let rounds = later.len().max(theirs.iter().map(Vec::len).max().unwrap_or(0));
+    let mut out = Vec::new();
+    for k in 0..rounds {
+        out.extend(theirs.iter().filter_map(|turns| turns.get(k).cloned()));
+        out.extend(later.get(k).cloned());
+    }
+    out
 }
 
 /// Engine `e`'s conversation as turns, oldest first: each from a user
@@ -667,6 +719,37 @@ mod tests {
         let d = build(&s, &idle);
         assert_eq!(d.threads[0].messages[1].work.as_ref().map(|w| w.phase.clone()), Some(Phase::Queued));
         assert_eq!((d.threads[0].messages[2].to.as_deref(), d.threads[0].messages[2].work.is_none()), (Some(YOU), true));
+    }
+
+    #[test]
+    fn a_thread_shows_the_work_a_post_led_to_the_childs_turns_and_the_report() {
+        let mut s = family();
+        let say = |s: &mut State, i: usize, role: Role, text: &str| s.engines[i].messages.push(Message { role, text: text.into() });
+        // You ask the translator; its turn starts helper and replies with the brief.
+        post(&mut s, "translator", YOU, Some("translator"), "make a tree script");
+        let wake = guided(&mut s, 0);
+        s.add_text(0, &wake[0]);
+        say(&mut s, 0, Role::Assistant, "thought: a child does it\nact: engine_start(name=\"helper\", goal=\"A tree script.\")");
+        say(&mut s, 0, Role::Tool, "engine_start(name=\"helper\", goal=\"A tree script.\") → made helper and started it");
+        say(&mut s, 0, Role::Assistant, "thought: say so\nact: reply(text=\"Started helper.\")");
+        // The child works and replies; that reply wakes the translator, which reports.
+        s.add_text(1, "Work on your goal.");
+        say(&mut s, 1, Role::Assistant, "thought: write it\nact: reply(text=\"Changed: tree.py\")");
+        s.add_text(0, "engine helper replied: \"Changed: tree.py\" (engines children)");
+        say(&mut s, 0, Role::Assistant, "thought: it holds\nact: reply(text=\"Done: tree.py prints the tree.\")");
+        let d = build(&s, &idle);
+        let m = &d.threads[0].messages[0];
+        assert_eq!(m.work.as_ref().unwrap().reply.as_deref(), Some("Started helper."));
+        let followed: Vec<(&str, Option<&str>)> = m.follow.iter().map(|t| (t.engine.as_str(), t.reply.as_deref())).collect();
+        assert_eq!(followed, [("helper", Some("Changed: tree.py")), ("translator", Some("Done: tree.py prints the tree."))], "the child's turn, then the report");
+        // A child that is not named in the work (tester) is not shown; a later post starts its own work.
+        assert!(m.follow.iter().all(|t| t.engine != "tester"));
+        post(&mut s, "translator", YOU, Some("translator"), "now a test");
+        let wake = guided(&mut s, 0);
+        s.add_text(0, &wake[0]);
+        let d = build(&s, &idle);
+        assert_eq!(d.threads[0].messages[0].follow.len(), 2, "the first post's work stops at the next post");
+        assert!(d.threads[0].messages[1].follow.is_empty());
     }
 
     #[test]

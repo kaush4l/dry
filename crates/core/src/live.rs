@@ -119,8 +119,7 @@ impl Live {
     }
 
     /// The tools that come with it (STANDARDS L3e in the old project): they
-    /// exist only while the artifact does. Alerts bring none yet: whether an
-    /// engine makes alerts with a tool or by writing files is still open.
+    /// exist only while the artifact does.
     pub fn tools(self) -> &'static [&'static str] {
         match self {
             Live::Scripts => &["script"],
@@ -131,7 +130,8 @@ impl Live {
             Live::Learning => &crate::learning::TOOLS,
             Live::Browser => &crate::browser::TOOLS,
             Live::Evidence => &crate::evidence::artifact::TOOLS,
-            Live::Clock | Live::Alerts => &[],
+            Live::Alerts => &crate::alert::TOOLS,
+            Live::Clock => &[],
         }
     }
 
@@ -155,7 +155,7 @@ impl Live {
         match self {
             Live::Clock => outside.clock.map(|c| c.to_string()),
             Live::Scripts => Some(crate::script::snapshot(&e.scripts)),
-            Live::Alerts => Some(crate::alert::snapshot(&e.alerts)),
+            Live::Alerts => Some(crate::alert::snapshot(&e.alerts, &e.alert_marks)),
             Live::File => outside.host.map(|h| crate::file::snapshot(text, h)),
             Live::Terminal => outside.host.map(|h| crate::terminal::snapshot(&e.id, name, text, h)),
             Live::Engines => outside.family.map(|f| crate::engines::snapshot(text, e, f)),
@@ -194,6 +194,12 @@ pub fn toolbox(e: &Engine) -> Vec<String> {
             if !tools.contains(&t) {
                 tools.push(t);
             }
+        }
+    }
+    // The tools those loaded skills bring of their own (`crate::skilltool`).
+    for t in crate::skilltool::names(e) {
+        if !tools.contains(&t) {
+            tools.push(t);
         }
     }
     // The current phase's tools (and goto_phase while there is another).
@@ -290,6 +296,7 @@ fn call_kind(
     let (id, target) = (id.to_string(), target.to_string());
     let no_family = || Err("this shell has no other engines to reach".to_string());
     Some(match kind {
+        Live::Alerts => crate::alert::call(&mut e.alerts, &mut e.alert_marks, call, host.now()),
         Live::File => crate::file::call(e.artifacts.get_mut(&target)?, call, host),
         Live::Terminal => {
             let done = crate::terminal::call(&id, &target, e.artifacts.get_mut(&target)?, call, host);
@@ -303,7 +310,15 @@ fn call_kind(
         }
         Live::Browser => crate::browser::call(&id, &target, e.artifacts.get_mut(&target)?, call, host),
         Live::Evidence => crate::evidence::artifact::call(&id, &target, e.artifacts.get(&target)?, call, host),
-        Live::Engines => family.map_or_else(no_family, |f| crate::engines::call(e, &target, call, f)),
+        Live::Engines => family.map_or_else(no_family, |f| {
+            // A child's root that is not there yet is made first: the parent
+            // has no terminal to make it with, and the child's artifacts
+            // need it to be there.
+            if let Some(root) = call.arg("root").map(str::trim).filter(|r| !r.is_empty() && !r.contains('\n') && call.arg("template").is_some()) {
+                host.make_root(root).map_err(|why| format!("the root {root} could not be made: {why}"))?;
+            }
+            crate::engines::call(e, &target, call, f)
+        }),
         Live::Shared => family.map_or_else(no_family, |f| crate::engines::shared_call(e, call, f, host.now())),
         Live::Learning if call.name == crate::learning::TOOLS[0] => crate::learning::collect(e, &target, call.arg("what").unwrap_or("")),
         Live::Learning if call.name == crate::learning::TOOLS[2] => {
@@ -376,6 +391,18 @@ pub struct Job<'a> {
 pub trait Host {
     /// Unix seconds now.
     fn now(&self) -> i64;
+    /// The wall clock: `now` with this machine's offset from UTC, which
+    /// says what `at 09:35` means for an alert. A host that does not know
+    /// its offset is on UTC.
+    fn clock(&self) -> Clock {
+        Clock::new(self.now(), 0)
+    }
+    /// Make the folder `root` when it is not there (a child engine is
+    /// about to be given it as its root; `engine_start`). A host with no
+    /// folders of its own to make does nothing.
+    fn make_root(&self, _root: &str) -> Result<(), String> {
+        Ok(())
+    }
     /// The files under `root`, relative paths, folders' insides after the
     /// folder's own files, at most `max`.
     fn list(&self, root: &str, max: usize) -> Result<Vec<String>, String>;

@@ -160,13 +160,31 @@ Routes (both `nav: no`, both `use` the workbench):
   view › button). A part the artifact does not attach says so and links
   the engine's whole view.
 
-The look is the code editor's own: each live route folder has an
-`overrides.md` with the Code page's dense, square, flat sizes and the
-editor's Light Modern colours in light mode and Dark Modern in dark, so
-it follows the app's mode instead of adding a picker (the Code page keeps
-its theme picker). Chosen because a person reads a workbench fastest in
-the look they already know, and the app's glass would blur the
-editor-dense parts.
+The look is a flat workbench (changed 2026-11-23): each live route folder
+has an `overrides.md` with the Code page's dense, square sizes and the
+colours of `themes/bolt.md` (a depth scale of near-blacks, hairline
+borders, one purple accent, learned from bolt.new and bolt.diy:
+docs/loop/bolt-study.md), in light and dark, so it follows the app's mode.
+The colours are written out there, so the workbench looks the same
+whatever theme the rest of the app wears; `bolt` is also a theme to pick
+in Settings for the whole app. No scene is drawn behind it. (Before: the
+code editor's Light Modern and Dark Modern.)
+
+**It follows the work** (2026-11-23):
+
+- The file the engine touched last (`liveview::last_file`: the newest
+  open, focus, edit or save in its answers) is the first tab, and the
+  first tab is the one a shell shows. A file being made shows before it is
+  saved, its lines marked as unsaved.
+- The newest or running session is the first in the panel. In the page it
+  is drawn again on the 2 s tick while a turn or a started command runs.
+- An `.html` file has a **Preview** above its code: the page it makes, in
+  a frame that runs the page's own script and nothing else (no network, no
+  way into the app: `html/render/live.rs` `preview`). HTML shells only.
+- The Desk leads there: under the post you wrote, the thread shows the
+  work it led to (`desk::follow`: the child's turns, then the report), and
+  an engine that holds files or a terminal has a **Code ›** link to its
+  live view on its row.
 
 On the web (2026-11-23): the same parts are drawn by the shared HTML
 renderer (`dry_html::render::live`), so the browser app shows a folder on

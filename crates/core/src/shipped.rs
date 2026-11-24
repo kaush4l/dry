@@ -95,7 +95,7 @@ mod tests {
         let s = state().unwrap();
         let t = &s.engines[0];
         assert_eq!((t.id.as_str(), t.parent.as_deref()), ("translator", None));
-        assert_eq!(t.tools, ["reply"], "the translator acts only through children and replies");
+        assert_eq!(t.tools, ["reply", "write"], "the translator acts only through children and replies; `write` keeps its plan and summary");
         let kinds: Vec<_> = crate::live::present(t).into_iter().map(|(_, k)| k).collect();
         assert!(kinds.contains(&crate::live::Live::Engines), "it holds an engines artifact");
         for k in [crate::live::Live::File, crate::live::Live::Terminal, crate::live::Live::Browser] {
@@ -119,9 +119,12 @@ mod tests {
         let dev = kits.get("developer").expect("a developer template");
         assert_eq!(dev.problem(), None);
         assert_eq!(dev.phases(), ["triage", "code", "test"]);
-        for skill in ["triage", "plan", "code-style", "test", "browser-qa", "critique", "debugging"] {
+        for skill in ["triage", "plan", "code-style", "test", "browser-qa", "critique", "debugging", "python"] {
             assert!(dev.skills.contains_key(skill), "developer skill {skill}");
         }
+        // A skill may bring tools of its own: python's read, and are named after it.
+        let python = crate::skilltool::parse("python", &dev.skill_tools["python"]).expect("python's tools.md reads");
+        assert_eq!(python.tools.iter().map(|t| t.tool.name.as_str()).collect::<Vec<_>>(), ["check", "run", "test"]);
         // Every phase's skills are the template's own.
         for p in crate::template::parse(&dev.template).unwrap().phases().unwrap() {
             for name in p.skills.unwrap_or_default() {

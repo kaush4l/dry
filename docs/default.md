@@ -25,6 +25,7 @@ default/                                  laid out as a store is (docs/engine-st
       about.md  template.md  tools.md
       artifacts/{code,terminal,evidence,browser,plan,notes}.md
       skills/{triage,plan,code-style,test,browser-qa,critique,debugging}/SKILL.md
+    artifacts/alerts.md                   kind: alerts   (alert: what wakes it by itself)
     artifacts/children.md                 kind: engines  (engine_start, engine_call)
     artifacts/thread.md                   kind: shared   (post, edit_post)
 ```
@@ -143,7 +144,11 @@ It is a loop with skills: one phase, no step limit.
   - `reply`, with `ask=` and `show=`;
   - `skill`;
   - `engine_start` / `engine_call` (children);
-  - `post` / `edit_post` (the thread; every post names `to`).
+  - `post` / `edit_post` (the thread; every post names `to`);
+  - `alert` (its alerts artifact, since 2026-11-23): it sets its own next
+    look ("in an hour", "each morning", "keep an eye on it") and is woken
+    with the text it wrote, with nobody writing to it
+    (docs/engine-standard.md, `kind: alerts`).
 
   **New thread** makes another root like it (`dry_core::shipped::new_thread`,
   `translator-2`), with its own thread (docs/desk.md).
@@ -167,8 +172,11 @@ It is a loop with skills: one phase, no step limit.
   a reviewer. In dry the translator joins them: it picks the child, approves
   a plan, and moves a reviewer's blockers back to the developer. No manager
   engine is added.
-- **It asks only what only the person knows**, such as which folder or
-  which of two behaviours, with one `ask=`.
+- **It goes ahead on its own.** A detail with one natural reading (how a
+  number is passed in, where a count starts) it decides, and says which
+  reading it took in the brief and the report. It asks, with one `ask=`,
+  only for a choice between two different results. With no folder named
+  the work happens in the workspace of its environment line (`root="."`).
 
 The `prompting` skill
 (`default/engines/translator/spec/skills/prompting/SKILL.md`) covers:
@@ -233,9 +241,24 @@ stores keep spec files by path already. Test:
 
 | phase | skills | what it does |
 |---|---|---|
-| triage | triage, plan, debugging | reads notes and the plan first (an approval goes straight to code; review findings become notes); opens the files and follows the flow; read-only commands; all evidence (`evidence(op="read")`, the browser page); restates the ask; writes the `plan` artifact (now with file:line, steps as `- [ ]` lines, proof). With "plan first" in its scope it replies with the plan and waits. No edit here |
-| code | code-style, debugging | the plan's steps in order, saved, in the repo's style; the toolchain's quickest compile check after each saved file (`cargo check`, `tsc --noEmit`, `bun build`), fixing what the edit broke; the same error after three fixes goes back to triage; each step ticked `- [x]` when it compiles; no tests here |
-| test | test, browser-qa, critique, debugging | the project's declared checks; runs it like its user (CLI output, `background` + browse, `evidence(op="run", expect=…)`, bun for TypeScript); critique against the ask, the plan and its steps (an open step is work not done); pass → one reply with the report; fail → notes → `goto_phase(name="triage")` |
+| triage | triage, plan, debugging | looks (`ls -la`, the environment line), then writes the plan: `## Ask`, `## Steps` as `- [ ]` lines, `## Proof` with the exact command and what it must print. An empty folder or something new needs no skill; something to change loads `triage` first. An approved plan goes straight to code. With "plan first" it replies with the plan and waits. No edit here |
+| code | code-style, python, debugging | **write, save and run in one act**, again until the output is right: a new file is `edit(path, new)` then `save`; the result of the run comes back at once. A missing runtime is installed as the environment line says. The same error three times loads `debugging`. Each step ticked `- [x]` when its file runs |
+| test | test, python, browser-qa, critique, debugging | the Proof's commands and the project's own checks, the smallest input and a larger one; the output compared with the ask line by line; wrong → notes → back to code; right → one reply with the report, in a step of its own |
+
+The loop was rewritten on 2026-11-23 for a small local model
+(docs/loop/journal.md): each phase's first line is one short sentence (the
+plan list in the prompt shows only that line), the long forms moved into
+the skills, and what a phase needs every time is in the phase.
+
+- **`python`** is the first skill that brings tools of its own
+  (`python.check`, `python.run`, `python.test`; docs/engine-standard.md
+  §4b).
+- **`elements.md`** in the template gives the child the `environment`
+  line: where its tools run, what is installed, and what can be installed
+  with which command (`environment::VM_PACKS`).
+- **Rules now in code, not only in the text:** a reply beside a `run` is
+  held back until the result was read (`turn.rs`); a file is made with
+  `edit(path, new)` (`file.rs`).
 
 What changed on 2026-11-23, and from where:
 - **Plan approval** (Open SWE's plan review, VS Code's Plan agent): with
@@ -500,10 +523,9 @@ Transcripts, states, diffs and host logs: `<scratchpad>/default/run6a/` to
   `edit` exists in triage. Haiku used it. A per-phase deny list (or the
   file artifact read-only in triage) would make "no edit in triage"
   structural.
-- **A `reply` beside a `run` in one act** is written before the results. A
-  core rule (defer or refuse a reply in an act with waiting calls) would
-  stop invented reports for every engine. Not done: `turn.rs` is being
-  changed by another agent.
+- **Done is not gated on a passing run.** A reply beside a `run` is held
+  back now, but nothing refuses a report with no run after the last save
+  (bolt.diy's rule, docs/loop/bolt-study.md).
 - **The host approval step for unattended `run`** is still planned
   (engine-standard §4b). The developer runs what the model asks, in the
   root.

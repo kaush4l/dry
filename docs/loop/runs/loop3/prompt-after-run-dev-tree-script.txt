@@ -1,0 +1,307 @@
+[System]
+## Instructions
+
+### Goal — what you are for, and who you serve
+A Python script that prints a centered tree of height n: each level has exactly 2 more '*' than the level above it (level 1: 1 star, level 2: 3 stars, ... level n: 2n-1 stars), every line centered.
+
+### Scope — what you do alone, when you stop and ask, what you never do
+Create only the one script in the project folder. Stop and reply if the folder does not exist or the task conflicts with what is there. Never commit, push or publish.
+
+### Done — what a finished result looks like, and how you show it
+Script exists in the project folder; running it (e.g. `python3 tree.py 5`) prints 5 centered levels with 1, 3, 5, 7, 9 stars. Reply with: Changed / Ran / Saw / Unverified / Also changed.
+
+## Phase
+
+The plan:
+1. triage — Look at what is there, then write the plan. Change no file yet.
+2. code — Write, save and run, again and again, until the output is right.
+3. **test** ← now, step 4
+
+Now, test:
+Prove it with runs you read, then report.
+1. Run each command of the plan's Proof, and the project's own checks when it declares any (load the test skill for a project with a build or tests). Run the smallest input and one larger one too.
+2. Compare what was printed with the ask, exactly: each line, the counts, the alignment. For a web page, look at it (load browser-qa when you have a browser artifact). For a change in a project, load the critique skill and judge against the plan.
+3. Wrong: write what failed and the exact output in the notes, then goto_phase(name="code").
+4. Right: reply, in a step of its own after the runs it quotes, with these lines:
+Changed: each file, one line on what it is or what changed
+Ran: each command, with its exit code and last lines
+Saw: the output that shows the ask is met, in its own words
+Unverified: what you could not check and why, or "nothing"
+Also changed: anything outside the plan, or "nothing"
+
+When it is done (or the work needs another phase), call goto_phase(name="..."). What was done so far is in the history. Reply when the whole work is done.
+
+## Tools
+
+Call these in `act`:
+- reply(text="...", ask="...", show="..."): Answer the user. Ends your turn. (text: what to say; ask: optional: an ask component, below; show: optional: a display component, below) To ask the user something, add ask= and they get a control instead of typing; their answer comes back as your next message, like `Answer (date): 2026-11-24 (Tue)`. One ask per reply. Use the one that fits:
+  choice (pick one): reply(ask="choice", options="Red|Green|Blue", text="Which colour?")
+  multi (pick any): reply(ask="multi", options="unit|ui|e2e", text="Which tests should I run?")
+  confirm (yes or no to one short question, no details): reply(ask="confirm", text="Delete the old logs?")
+  date (a day): reply(ask="date", text="Which day?")
+  datetime (a day and a time): reply(ask="datetime", text="When should I run it?")
+  number (how many, how much): reply(ask="number", min="1", max="10", unit="copies", text="How many copies?")
+  text (a short typed answer): reply(ask="text", placeholder="project name", text="What is the project called?")
+  review (show the details of a plan to check, edit or reject before you act): reply(ask="review", title="Deploy", rows="env: staging|time: 18:00", text="Is this right?")
+  form (several questions at once): reply(ask="form", title="Booking", fields="Day:date|Guests:number(1-12)|Seat:choice(inside,terrace)|Notes:text", text="A few details for the table:")
+Options and rows are separated by |. A form's fields are Label:kind, with options or a range in brackets. To show data with a reply, add show= and data= (it can go with an ask=); the user sees a real table, list, bar or numbers. One show per reply:
+  table (rows and columns): reply(show="table", data="Name|Age;Ada|36;Bob|41", text="Here are the users.")
+  list (a few items): reply(show="list", data="lint passed|3 tests failed|build skipped", text="The CI run:")
+  progress (how far along): reply(show="progress", data="7/10 tests passed", text="Still running.")
+  stat (headline numbers): reply(show="stat", data="Revenue|$12.4k|+8%;Users|1204|-3%", text="This week:")
+In data, | separates the cells of a row and ; the rows; a table's first row is its header, a stat is label|value|change.
+- write(name="...", text="..."): Save an artifact (replaces one of the same name). (name: a short name; text: its whole content)
+- read(name="..."): Read an artifact. (name: its name)
+- list(): The names of all artifacts.
+- skill(name="..."): Load one of your skills (listed in the skills artifact): its instructions come back, and its tools are yours until the next message. (name: the skill's name)
+- open(path="..."): Open a file of your file artifact: its text is in the artifact from now on, as it is on disk at every step. Open several at once with `|`: path="src/a.rs|src/b.rs". (path: relative to its root)
+- focus(path="...", from="...", to="..."): Show only these lines of an open (or not yet open) file, for a big one. (path: relative to its root; from: first line; to: last line)
+- edit(path="...", old="...", new="..."): Change an open file: the old text (exactly once in it) becomes the new. Held as unsaved, shown marked *, until save. To make a new file, give its path and only new (no old, no open first): new is its whole text. (path: an open file, or a new file's path; old: the text to replace, exactly; left out for a new file; new: what it becomes)
+- save(path="..."): Write a file's unsaved edits to disk. (path: the file)
+- run(command="..."): Run a shell command in the terminal's root and wait for it. Back: its exit code and last lines. For a long one use start. (command: the command line)
+- start(command="..."): Start a long command and go on at once; when it ends a message wakes you. Its output is in the terminal artifact. (command: the command line)
+- background(command="..."): Start a command that keeps running (a server, a watcher); no message when it ends. Its state is in the terminal artifact. (command: the command line)
+- browse(url="..."): Open a page of an app on this machine (localhost) in your browser artifact: its text, console errors and a screenshot are in the artifact from now on. (url: http://127.0.0.1:…/ or http://localhost:…/)
+- click(target="..."): Click an element of the open page: a CSS selector, or the text it shows (a button's, a link's). (target: a selector or the visible text)
+- type(target="...", text="..."): Type text into a field of the open page; key="Enter" presses a key after. (target: a selector, the field's label or placeholder; text: what to type)
+- evidence(op="...", expect="..."): The project's evidence (docs/evidence.md): op="run" builds and starts the app, shoots every scenario and compares with the committed baseline; op="read" reads the last run. Back: one line; the summary is in the evidence artifact. Optional: expect="home,settings" (scenarios your change should change: those pass), update="yes" (take every shot as the new baseline). (op: run or read; expect: optional: scenarios expected to change, comma separated)
+- post(text="...", to="..."): Post a directed message on your thread (you, your head and every engine of its tree see it). Only the engine named in `to` is called; say what, why, what done looks like and where the material is, so it can act without having seen anything else. (text: the message, at most 600 characters; to: the engine's id, or `you` for the person; a post with no `to` comes back to you undelivered)
+- edit_post(n="...", text="..."): Change an entry of yours in the shared context; text="" removes it. (n: the entry's number; text: its new text, or "")
+- goto_phase(name="..."): Move to another phase of the plan (see Phase): on when this one is done, or back when the work needs it. (name: the phase to go to)
+- python.check(file="..."): Compile one Python file without running it: exit 0 and no output when its syntax is fine, else the error with its line. (file: string, required, the file, relative to the root)
+- python.run(file="...", arg="...", arg2="...", arg3="..."): Run one Python file, with up to three arguments. (file: string, required, the file, relative to the root; arg: string, its first argument; arg2: string, its second argument; arg3: string, its third argument)
+- python.test(): Run the folder's unittest tests (test_*.py), each named with its result.
+
+## Artifacts
+
+### notes (75 characters)
+
+## Notes
+
+(none yet: a failed test writes here, and triage reads it first)
+
+### plan (360 characters)
+
+## Ask
+Build tree.py: print a centered star tree of height n, n from sys.argv defaulting to 5; level k has 2k-1 stars; each line centered on the widest line (last level).
+
+## Steps
+- [x] tree.py — the script
+
+## Proof
+python3 tree.py 5 prints 5 centered levels: 1, 3, 5, 7, 9 stars, every line centered on 9-char width; python3 tree.py prints the same default.
+
+### skills — your skills
+
+Load one with skill(name="...") when the work needs it.
+- browser-qa: Check a running web app through the browser artifact - open the page, use it the way a person would, read its text and console errors, and record what was seen.
+- critique: Judge the result against the plan and the ask before replying - only findings you can show count - then pass with the report, or fail back to triage with notes.
+- debugging: When something fails and the cause is not obvious - build a fast loop that shows the failure, then test one hypothesis at a time; never guess-and-edit.
+- python: Write, check, run and test a Python file with tools made for it - load it when the work is Python.
+- test: Build, run and exercise the change with whatever this machine offers (terminal, evidence, browser, native runtimes such as bun), then hand the result to critique.
+
+### code — files on disk as they are now, and the ones you have open
+
+(taken when the prompt is sent)
+
+### terminal — your terminal: what is running and what last ran
+
+(taken when the prompt is sent)
+
+### shared — your thread: the user and every engine of your tree; how you talk to each other
+
+(taken when the prompt is sent)
+
+### browser — a page in a browser as it is now: its text, its console errors, its last screenshot
+
+(taken when the prompt is sent)
+
+### evidence — the project's evidence: every scenario's screenshot and page text against the committed baseline, and what changed
+
+(taken when the prompt is sent)
+
+environment: host · ready · /Users/kaush/Downloads/Dev/dry-learn-loop · python3, node, bun, java, rustc, cargo, gcc
+
+[User]
+Work on your goal (see your instructions), then reply with the result.
+
+Folder /Volumes/Backup/dry-build/loop-run/loop3/proj. Spec: n comes from the command line (sys.argv), defaulting to 5 if not given. Level 1 has 1 star; each level adds 2 (level k has 2k-1 stars). Center alignment: each line centered on the width of the widest line (the last level). Filename: tree.py. No new dependencies.
+
+[Assistant]
+Let me start by checking the folder.
+act: run(command="ls -la")
+
+[Tool]
+run(command="ls -la") → session 1 `ls -la`: exit 0
+total 0
+drwxr-xr-x  2 kaush staff  64 Nov 23 22:44 .
+drwxr-xr-x 13 kaush staff 416 Nov 23 22:45 ..
+
+[Assistant]
+The folder is empty, so this is a fresh build — no triage skill needed. I'll write the plan artifact, then move to code.
+
+[Tool]
+Your answer did not follow the response contract (no `key: value` lines in the answer). Answer again, written as the Response section says.
+
+[Assistant]
+thought: The folder is empty — this is a fresh build. I'll write the plan artifact (fresh-folder plan, no triage skill needed), then move to code phase.
+act: write(name="plan", text="## Ask\nBuild tree.py: print a centered star tree of height n, n from sys.argv defaulting to 5; level k has 2k-1 stars; each line centered on the widest line (last level).\n\n## Steps\n- [ ] tree.py — the script\n\n## Proof\npython3 tree.py 5 prints 5 centered levels: 1, 3, 5, 7, 9 stars, every line centered on 9-char width; python3 tree.py prints the same default.")
+
+[Tool]
+write(name="plan", text="## Ask\nBuild tree.py: print a centered star tree of height n…") → saved plan (360 characters)
+
+[Assistant]
+thought: Plan artifact is saved. The user message doesn't ask for plan-first approval, so I'll move straight into the code phase.
+act: goto_phase(name="code")
+
+[Tool]
+goto_phase(name="code") → left triage; now code
+
+[Assistant]
+thought: The plan artifact is saved and the folder is empty, so the work is a fresh Python script. The work is in Python, so I should load the python skill before writing the file — it brings tools made for writing/checking/running Python.
+act: skill(name="python")
+
+[Tool]
+skill(name="python") → Skill `python` loaded. Follow it:
+
+# Python: check it, run it, read it
+
+This skill brings three tools. Each runs in your terminal, in the root,
+and comes back with the exit code and the last lines, as `run` does.
+
+- `python.check(file="tree.py")` compiles the file without running it.
+  No output and exit 0 means the syntax is fine. Call it after every save.
+- `python.run(file="tree.py", arg="5")` runs the file with one argument
+  (`arg2`, `arg3` for more; leave them out for none). Use it instead of
+  writing a command line.
+- `python.test()` runs the tests the folder holds (`test_*.py`, with the
+  standard library's unittest). Use it only when there are any.
+
+How to work:
+
+1. **Write the whole file, save, check, run, in one act.**
+   `edit(path="tree.py", new="..."); save(path="tree.py"); python.check(file="tree.py"); python.run(file="tree.py", arg="3")`
+2. **Inside `new="..."`** a double quote is written `\"` and a backslash is
+   written `\\` (so Python's `"\n"` is `\"\\n\"`). Single-quoted Python
+   strings need no escape: prefer `'*'` to `"*"`.
+3. **Read every line that came back.** Count the characters of a line
+   when the ask is about width or alignment. A traceback names the line:
+   fix that line with `edit(path, old="the exact line", new="...")`, save,
+   and run again.
+4. **Input from the command line** is `sys.argv[1]`; say what happens with
+   no argument (a usage line and a non-zero exit, or a default).
+5. **Only the standard library** unless the project already uses more:
+   nothing can be installed with pip here.
+6. **`python3: not found`**: your environment line gives the command that
+   installs it; run that once, then go on.
+
+It brings these tools, yours until the next message (each runs in your terminal):
+- python.check(file="..."): Compile one Python file without running it: exit 0 and no output when its syntax is fine, else the error with its line. (file: string, required, the file, relative to the root)
+- python.run(file="...", arg="...", arg2="...", arg3="..."): Run one Python file, with up to three arguments. (file: string, required, the file, relative to the root; arg: string, its first argument; arg2: string, its second argument; arg3: string, its third argument)
+- python.test(): Run the folder's unittest tests (test_*.py), each named with its result.
+
+[Assistant]
+thought: The folder is empty and the work is a fresh Python script. The plan: build tree.py with n from sys.argv (default 5), level k has 2k-1 stars, lines centered on the widest line. I'll write the file, save, compile-check and run it with a couple of arguments.
+act: edit(path="tree.py", new="#!/usr/bin/env python3\nimport sys\n\n\ndef main():\n    if len(sys.argv) > 1:\n        try:\n            n = int(sys.argv[1])\n        except ValueError:\n            print('usage: tree.py [height]', file=sys.stderr)\n            sys.exit(2)\n        if n < 1:\n            print('height must be at least 1', file=sys.stderr)\n            sys.exit(2)\n    else:\n        n = 5\n\n    width = 2 * n - 1\n    for k in range(1, n + 1):\n        line = '*' * (2 * k - 1)\n        print(line.center(width))\n\n\nif __name__ == '__main__':\n    main()\n"); save(path="tree.py"); python.check(file="tree.py"); python.run(file="tree.py", arg="5"); python.run(file="tree.py"); python.run(file="tree.py", arg="1")
+
+[Tool]
+edit(path="tree.py", new="#!/usr/bin/env python3\nimport sys\n\n\ndef main():\n    if len(s…") → new file tree.py (25 lines, unsaved; save(path="tree.py") writes it)
+save(path="tree.py") → saved tree.py (1 edit, 25 lines)
+python.check(file="tree.py") → session 2 `'python3' '-m' 'py_compile' 'tree.py'`: exit 0
+(no output)
+python.run(file="tree.py", arg="5") → session 3 `'python3' 'tree.py' '5'`: exit 0
+    *    
+   ***   
+  *****  
+ ******* 
+*********
+python.run(file="tree.py") → session 4 `'python3' 'tree.py'`: exit 0
+    *    
+   ***   
+  *****  
+ ******* 
+*********
+python.run(file="tree.py", arg="1") → session 5 `'python3' 'tree.py' '1'`: exit 0
+*
+
+[Assistant]
+thought: The script works — n=5 prints 5 centered levels (1, 3, 5, 7, 9 stars, each line 9 chars wide), the default run prints the same, and n=1 prints a single centered star. I'll do one more check on bad input handling, then tick the plan step and move to test.
+act: python.run(file="tree.py", arg="abc"); python.run(file="tree.py", arg="0")
+
+[Tool]
+python.run(file="tree.py", arg="abc") → session 6 `'python3' 'tree.py' 'abc'`: exit 2
+usage: tree.py [height]
+python.run(file="tree.py", arg="0") → session 7 `'python3' 'tree.py' '0'`: exit 2
+height must be at least 1
+
+[Assistant]
+thought: The script works: n=5 prints 5 centered levels with 1, 3, 5, 7, 9 stars centered on a 9-char line; the default run is identical; n=1 prints one star; bad input exits 2 with a usage line. I'll tick the plan step and move to the test phase.
+act: write(name="plan", text="## Ask\nBuild tree.py: print a centered star tree of height n, n from sys.argv defaulting to 5; level k has 2k-1 stars; each line centered on the widest line (last level).\n\n## Steps\n- [x] tree.py — the script\n\n## Proof\npython3 tree.py 5 prints 5 centered levels: 1, 3, 5, 7, 9 stars, every line centered on 9-char width; python3 tree.py prints the same default."); goto_phase(name="test")
+
+[Tool]
+write(name="plan", text="## Ask\nBuild tree.py: print a centered star tree of height n…") → saved plan (360 characters)
+goto_phase(name="test") → left code; now test
+
+[Assistant]
+thought: I'm in the test phase. The plan's Proof has two commands (tree.py 5 and the default run), and there are no tests in the folder, so no test skill needed. I'll re-run the proof commands exactly, plus the smallest (n=1) and one larger (n=7) input, and print each line's repr and length to verify alignment and widths exactly.
+act: run(command="python3 -c \"import subprocess; out=subprocess.check_output(['python3','tree.py','5'],text=True).splitlines(); [print(repr(l), len(l)) for l in out]\""); run(command="python3 tree.py 5 | cat -A"); python.run(file="tree.py"); python.run(file="tree.py", arg="1"); python.run(file="tree.py", arg="7")
+
+[Tool]
+run(command="python3 -c "import subprocess; out=subprocess.check_output([…") → session 8 `python3 -c "import subprocess; out=subprocess.check_output(['python3','tree.py',…`: exit 0
+'    *    ' 9
+'   ***   ' 9
+'  *****  ' 9
+' ******* ' 9
+'*********' 9
+run(command="python3 tree.py 5 | cat -A") → session 9 `python3 tree.py 5 | cat -A`: exit 0
+    *    $
+   ***   $
+  *****  $
+ ******* $
+*********$
+python.run(file="tree.py") → session 10 `'python3' 'tree.py'`: exit 0
+    *    
+   ***   
+  *****  
+ ******* 
+*********
+python.run(file="tree.py", arg="1") → session 11 `'python3' 'tree.py' '1'`: exit 0
+*
+python.run(file="tree.py", arg="7") → session 12 `'python3' 'tree.py' '7'`: exit 0
+      *      
+     ***     
+    *****    
+   *******   
+  *********  
+ *********** 
+*************
+
+[Assistant]
+thought: The proof commands run and look right. I want one rigorous width/star-count check on the larger n=7 input before I pass, then I can report.
+act: run(command="python3 -c \"import subprocess; out=subprocess.check_output(['python3','tree.py','7'],text=True).splitlines(); [print(repr(l), len(l), l.count('*')) for l in out]\"")
+
+[Tool]
+run(command="python3 -c "import subprocess; out=subprocess.check_output([…") → session 13 `python3 -c "import subprocess; out=subprocess.check_output(['python3','tree.py',…`: exit 0
+'      *      ' 13 1
+'     ***     ' 13 3
+'    *****    ' 13 5
+'   *******   ' 13 7
+'  *********  ' 13 9
+' *********** ' 13 11
+'*************' 13 13
+
+## Response
+
+Answer with one line per key, written `key: value`, in this order, and nothing else. A long value may go on over the next lines. The keys:
+- thought: A few sentences: what was asked, what is really needed, and what you do next and why.
+- act: Always written, on its own line that starts with `act:`. The tool calls for this step, written `name(key="value")` and separated by `;`. Put every call this step needs in one `act` (open three files, edit, run the tests, ask two children): they all start at once; changes like open and edit apply first in the order written, then everything that waits (run, engine_call, MCP tools) waits together, and the results come back in the order written. To answer the user, call `reply(text="...")`. To ask them something, add one `ask=` to the reply (see reply in Tools) instead of asking in words; to show them a table, list, progress or numbers, add `show=`.
+Like this:
+thought: ...
+act: ...
+
+[Assistant]
+thought: The script is written and runs correctly. The plan's Proof commands were run in the test phase — tree.py 5 and the default run both print 5 centered levels (1, 3, 5, 7, 9 stars) on a 9-char line; I also checked the smallest input (n=1) and a larger one (n=7) with exact per-line repr/length/star-count, plus the error paths (bad arg and n=0 exit 2 with a usage line). Everything matches the ask, so this is a pass: I reply with the report.
+act: reply(text="Changed: tree.py — new file: prints a centered star tree of height n; n comes from sys.argv[1], default 5; level k has 2k-1 stars; each line centered on the widest line (width 2n-1, the last level). Standard library only.\n\nRan:\n- python3 tree.py 5 — exit 0\n- python3 tree.py — exit 0 (default, identical output)\n- python3 tree.py 1 — exit 0, prints '*'\n- python3 tree.py 7 — exit 0\n- python3 tree.py abc — exit 2, 'usage: tree.py [height]'\n- python3 tree.py 0 — exit 2, 'height must be at least 1'\n- python3 -c repr/len/count check (n=5 and n=7) — exit 0, exact widths and star counts\n\nSaw:\n    *    \n   ***   \n  *****  \n ******* \n*********\n\nEvery line exactly 9 characters, centered, with 1/3/5/7/9 stars — the plan's Proof. Default run is identical. The repr check confirms it: '    *    ' 9, '   ***   ' 9, '  *****  ' 9, ' ******* ' 9, '*********' 9. For n=7 the lines are 13 characters with 1/3/5/7/9/11/13 stars, centered, e.g. '      *      ' 13 1 … '*************' 13 13.\n\nUnverified: nothing.\n\nAlso changed: nothing.")
+
+[not sent]
+- Learning: nothing learned yet (memory/learning.md is empty)

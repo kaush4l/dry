@@ -366,3 +366,123 @@ fn one_loop_runs_completely_from_your_ask_to_the_heads_report() {
     }
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// Two loops side by side, and a head that goes on by itself while its
+/// plan is open (docs/night/journal.md):
+///
+/// ```text
+/// you ─post─▶ translator: write(plan: two `- [ ]` lines) + engine_start(dev-a) + engine_start(dev-b) + reply(the briefs), one act
+///                ├─▶ dev-a (root a/, made for it): writes and runs a.txt → reply
+///                └─▶ dev-b (root b/, made for it): writes and runs b.txt → reply
+///             translator ◀─ one wake with both replies → ticks a, leaves b open, replies
+///             ... nobody works, the plan holds an open step, three minutes pass ...
+///             translator ◀─ "Alert keep-going fired (idle 3m)" → ticks b, replies with the summary
+///             ... quiet again, no open step: the alert stays silent
+/// ```
+#[test]
+fn two_loops_run_side_by_side_and_the_head_goes_on_while_its_plan_is_open() {
+    let dir = std::env::temp_dir().join(format!("dry-two-loops-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(dir.join("project")).unwrap();
+    std::fs::create_dir_all(dir.join("engines")).unwrap();
+    let dir = dir.canonicalize().unwrap();
+    let project = dir.join("project");
+
+    let mut state = dry_core::shipped::state().unwrap();
+    let ai =
+        OpenAi { base_url: "http://scripted.invalid/v1".into(), model: "scripted".into(), context: Some(200_000), ..OpenAi::default() };
+    for e in &mut state.engines {
+        e.inference = ai.clone();
+    }
+    let head = state.index_of(dry_core::shipped::HEAD).unwrap();
+    assert!(state.engines[head].alerts.contains_key("keep-going"), "the shipped translator holds the keep-going alert");
+
+    let start = |name: &str| {
+        format!(
+            "engine_start(name=\"dev-{name}\", template=\"developer\", root=\"{name}\", goal=\"Make {name}.txt holding the word {name}.\", scope=\"Only {name}.txt.\", done=\"cat {name}.txt prints {name}.\", text=\"Write {name}.txt and show it with cat.\")"
+        )
+    };
+    let child = |name: &str, other: &str| {
+        VecDeque::from([
+            // Its own brief and its own root; nothing of its sibling's.
+            says(&format!("goto_phase(name=\"code\"); edit(path=\"{name}.txt\", new=\"{name}\"); save(path=\"{name}.txt\"); run(command=\"cat {name}.txt\")"))
+                .has(&format!("Make {name}.txt holding the word {name}."))
+                .has(&format!("root: {name}"))
+                .lacks(&format!("Make {other}.txt"))
+                .lacks(&format!("root: {other}")),
+            says(&format!("reply(text=\"Changed: {name}.txt. Ran: cat {name}.txt, exit 0, {name}. Saw: the file holds {name}. Unverified: nothing.\")"))
+                .has(&format!("`cat {name}.txt`: exit 0\n{name}"))
+                // The thread is shared (your post names both files); its sibling's work is not here.
+                .lacks(&format!("cat {other}.txt"))
+                .lacks(&format!("Make {other}.txt")),
+        ])
+    };
+    let mut model = Script::default();
+    model.turns.insert(
+        "translator".into(),
+        VecDeque::from([
+            // 1. The plan, both children and the briefs to you, in one act.
+            says(&format!(
+                "write(name=\"plan\", text=\"## Plan\\n- [ ] a.txt: dev-a\\n- [ ] b.txt: dev-b\"); {}; {}; reply(text=\"Plan written; started dev-a and dev-b together.\")",
+                start("a"),
+                start("b")
+            ))
+            .has("two files")
+            .has("keep-going (idle 3m, while `plan` has an open `- [ ]` step)"),
+            // 2. One wake carries both replies; the plan shows both lines open.
+            says("write(name=\"plan\", text=\"## Plan\\n- [x] a.txt: dev-a\\n- [ ] b.txt: dev-b\"); reply(text=\"a is done; b is next.\")")
+                .has("engine dev-a replied:")
+                .has("engine dev-b replied:")
+                .has("- [ ] a.txt: dev-a"),
+            // 3. Nobody wrote: its own alert woke it, because a step is open.
+            says("write(name=\"plan\", text=\"## Plan\\n- [x] a.txt: dev-a\\n- [x] b.txt: dev-b\"); write(name=\"summary\", text=\"Asked: two files. Work: dev-a made a.txt, dev-b made b.txt.\"); reply(text=\"Asked: two files. Work: dev-a made a.txt, dev-b made b.txt.\")")
+                .has("Alert keep-going fired (idle 3m): Your plan has an open `- [ ]` step")
+                .has("- [ ] b.txt: dev-b")
+                .has("last reply: Changed: b.txt"),
+        ]),
+    );
+    model.turns.insert("dev-a".into(), child("a", "b"));
+    model.turns.insert("dev-b".into(), child("b", "a"));
+
+    let disk = Disk { repo: project.clone(), engines: dir.join("engines") };
+    let mut lp = Loop { state, disk, model, status: BTreeMap::new() };
+    let (thread, post) =
+        dry_core::desk::your_post(&lp.state, "", Some("translator"), "Make two files, a.txt and b.txt; they do not need each other.", dry_tools::live::clock().unix)
+            .unwrap();
+    dry_core::shared::post(&mut lp.state, &thread, &post).unwrap();
+    lp.run(Duration::from_secs(20));
+
+    // Both children ran, each in the root made for it, and the head heard both at once.
+    assert_eq!(std::fs::read_to_string(project.join("a/a.txt")).unwrap(), "a");
+    assert_eq!(std::fs::read_to_string(project.join("b/b.txt")).unwrap(), "b");
+    let calls = |lp: &Loop, engine: &str| lp.model.sent.iter().filter(|s| s.engine == engine).count();
+    assert_eq!((calls(&lp, "translator"), calls(&lp, "dev-a"), calls(&lp, "dev-b")), (2, 2, 2));
+    // Quiet, with an open step: the alert has been looked at and not fired.
+    let mark = lp.state.engines[head].alert_marks["keep-going"];
+    assert!(mark.fired == 0 && mark.quiet.is_some(), "{mark:?}");
+
+    // Three minutes of quiet later (the mark moved back, not the clock).
+    let back = |lp: &mut Loop, secs: i64| {
+        let m = lp.state.engines[head].alert_marks.get_mut("keep-going").unwrap();
+        m.created -= secs;
+        m.quiet = m.quiet.map(|q| q - secs);
+        m.last = m.last.map(|l| l - secs);
+    };
+    back(&mut lp, 181);
+    lp.run(Duration::from_secs(20));
+    assert_eq!(calls(&lp, "translator"), 3, "the alert started the head's third turn");
+    assert_eq!(lp.state.engines[head].alert_marks["keep-going"].fired, 1);
+    assert!(lp.state.engines[head].artifacts["summary"].starts_with("Asked: two files."));
+
+    // Quiet again, every step ticked: the alert stays silent however long.
+    back(&mut lp, 3_600);
+    lp.run(Duration::from_secs(20));
+    assert_eq!(calls(&lp, "translator"), 3, "no open step, no wake (an extra model call would have panicked)");
+    for (engine, left) in &lp.model.turns {
+        assert!(left.is_empty(), "{engine}: {} scripted answers were never asked for", left.len());
+    }
+    // The run's marks are part of what is saved.
+    let saved = dry_core::store::to_texts(&lp.state);
+    assert!(saved["engines/translator/convo/run.md"].contains("alert: keep-going "), "{}", saved["engines/translator/convo/run.md"]);
+    let _ = std::fs::remove_dir_all(&dir);
+}

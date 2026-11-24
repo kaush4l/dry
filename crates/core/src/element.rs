@@ -318,7 +318,10 @@ impl Element {
             }
             Element::Tools => {
                 let names = crate::live::toolbox(e);
-                Contribution { text: Some(crate::tools::describe(&names)), tools: names, ..Contribution::default() }
+                // The loaded skills' own tools after the built-in ones.
+                let lines = [crate::tools::describe(&names), crate::skilltool::describe(e)];
+                let text = lines.iter().filter(|l| !l.is_empty()).cloned().collect::<Vec<_>>().join("\n");
+                Contribution { text: Some(text), tools: names, ..Contribution::default() }
             }
             Element::OutsideTools => {
                 let brought = capability::describe(e);

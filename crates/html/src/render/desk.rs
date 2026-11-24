@@ -122,6 +122,10 @@ pub fn desk(out: &mut String, cx: &Ctx) {
         if let Some(w) = &m.work {
             work(out, cx, w, &format!("{}:{}", thread.id, m.n));
         }
+        // What it led to with no post of its own: a child's turns, the report.
+        for (k, w) in m.follow.iter().enumerate() {
+            work(out, cx, w, &format!("{}:{}:then{k}", thread.id, m.n));
+        }
         out.push_str("</article>");
     }
     out.push_str("</div>");
@@ -190,9 +194,16 @@ fn work(out: &mut String, cx: &Ctx, t: &Turn, key: &str) {
         (p, _) => p.word().to_string(),
     };
     let href = i.map(dry_core::routes::engine_path).unwrap_or_default();
+    // An engine that holds files or a terminal: its live view is one click
+    // from where the person follows the thread (the code as it is written,
+    // the commands as they run).
+    let live = i
+        .filter(|i| !dry_core::liveview::developer(&cx.world.state.engines[*i]).is_empty())
+        .map(|i| format!("<a class=\"live-link\" href=\"{}\" title=\"its files and terminal, live\">Code ›</a>", esc(&dry_core::liveview::path(i, None))))
+        .unwrap_or_default();
     let _ = write!(
         out,
-        "<div class=\"turn phase-{}\" data-key=\"work:{}\"><div class=\"turn-head\"><span class=\"mark {class}\">{m}</span><a href=\"{}\"><b>{}</b></a><span class=\"note trunc\">{}</span></div>",
+        "<div class=\"turn phase-{}\" data-key=\"work:{}\"><div class=\"turn-head\"><span class=\"mark {class}\">{m}</span><a href=\"{}\"><b>{}</b></a><span class=\"note trunc\">{}</span>{live}</div>",
         t.phase.word(),
         esc(key),
         esc(&href),

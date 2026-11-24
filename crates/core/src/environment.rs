@@ -122,6 +122,25 @@ pub fn parse_runtimes(out: &str) -> Vec<String> {
     RUNTIMES.iter().filter(|r| found.contains(r)).map(|r| r.to_string()).collect()
 }
 
+/// A runtime pack: a runtime a machine does not have yet and the one
+/// command that adds it (docs/elements.md, "The environment's runtimes").
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Pack {
+    /// The runtime it brings, as in `RUNTIMES`.
+    pub runtime: &'static str,
+    /// The command that installs it, for `run`.
+    pub install: &'static str,
+}
+
+/// The packs the browser VM can add: exactly the packages served beside
+/// the app (`scripts/vm-fetch.py` `PACKAGES`, copied by
+/// `scripts/web-build.sh`), so installing one needs no network but the
+/// page's own origin. Nothing else is on that mirror (no git, no pip).
+pub const VM_PACKS: &[Pack] = &[
+    Pack { runtime: "python3", install: "apk add python3" },
+    Pack { runtime: "tcc", install: "apk add tcc tcc-libs-static tcc-dev musl-dev" },
+];
+
 /// Whether a command may have installed or removed a runtime, so the
 /// check is run again after it (`apk add`, `apk del`).
 pub fn installs(command: &str) -> bool {
@@ -154,7 +173,25 @@ impl Environment {
             Some(_) => parts.push("saved".into()),
             None => {}
         }
-        format!("environment: {}", parts.join(" · "))
+        let mut line = format!("environment: {}", parts.join(" · "));
+        // What is missing and can be added, with the command: an engine
+        // told only "not on PATH" has no way to know a runtime is one run away.
+        let packs = self.packs();
+        if !packs.is_empty() {
+            let each: Vec<String> = packs.iter().map(|p| format!("{} with run(command=\"{}\")", p.runtime, p.install)).collect();
+            line.push_str(&format!("\ninstall when needed: {}; nothing else can be installed here (no git, no pip)", each.join(", ")));
+        }
+        line
+    }
+
+    /// The runtime packs this environment can add and does not have yet
+    /// (the browser VM's, once its runtimes were checked; a host installs
+    /// its own way, so none are named for it).
+    pub fn packs(&self) -> Vec<Pack> {
+        match (&self.kind, &self.runtimes) {
+            (Kind::BrowserVm, Some(have)) => VM_PACKS.iter().filter(|p| !have.iter().any(|h| h == p.runtime)).copied().collect(),
+            _ => Vec::new(),
+        }
     }
 
     pub fn ready(&self) -> bool {
@@ -185,6 +222,10 @@ impl Environment {
         }
         if let Some(r) = &self.runtimes {
             rows.push(("runtimes", if r.is_empty() { format!("none of {} on PATH", RUNTIMES.join(", ")) } else { r.join(", ") }));
+        }
+        let packs = self.packs();
+        if !packs.is_empty() {
+            rows.push(("can install", packs.iter().map(|p| format!("{} ({})", p.runtime, p.install)).collect::<Vec<_>>().join(", ")));
         }
         if self.kind == Kind::BrowserVm {
             rows.push((
@@ -292,24 +333,31 @@ pub mod vm {
     pub const MIRROR_FILES: usize = 2_000;
     pub const MIRROR_BYTES: u64 = 16 * 1024 * 1024;
 
-    /// An artifact's root as a folder in the VM. A root is a folder of
-    /// the workspace (`.`, `src`); an absolute one is refused.
-    pub fn dir(root: &str) -> Result<String, String> {
+    /// A root as a folder of the workspace: `.` or `src` as written.
+    /// `/work` and `/work/src` mean the same (the workspace by its full
+    /// path, as the environment line shows it, so an engine that copies
+    /// that path is not refused). Any other absolute root is refused.
+    pub fn folder(root: &str) -> Result<String, String> {
         let r = root.trim();
-        if r.starts_with('/') {
-            return Err(format!("the root {r} is absolute: in the browser's VM a root is a folder of {WORK} (`.` is {WORK})"));
+        if !r.starts_with('/') {
+            return Ok(r.to_string());
         }
-        let d = crate::workspace::root_dir(r)?;
+        match r.trim_end_matches('/').strip_prefix(WORK) {
+            Some("") => Ok(".".into()),
+            Some(rest) if rest.starts_with('/') => Ok(rest[1..].to_string()),
+            _ => Err(format!("the root {r} is not in the workspace: in the browser's VM a root is {WORK} or a folder of it (`.` is {WORK})")),
+        }
+    }
+
+    /// An artifact's root as a folder in the VM (`folder`).
+    pub fn dir(root: &str) -> Result<String, String> {
+        let d = crate::workspace::root_dir(&folder(root)?)?;
         Ok(if d.is_empty() { WORK.to_string() } else { format!("{WORK}/{d}") })
     }
 
     /// A path under an artifact's root as a path relative to `WORK`.
     pub fn rel(root: &str, path: &str) -> Result<String, String> {
-        let r = root.trim();
-        if r.starts_with('/') {
-            return Err(format!("the root {r} is absolute: in the browser's VM a root is a folder of {WORK} (`.` is {WORK})"));
-        }
-        let p = crate::workspace::in_root(r, path)?;
+        let p = crate::workspace::in_root(&folder(root)?, path)?;
         let parts: Vec<&str> = p.split('/').filter(|x| !x.is_empty() && *x != ".").collect();
         if parts.contains(&"..") || parts.is_empty() {
             return Err(format!("{path} is not a file of the workspace"));
@@ -563,6 +611,17 @@ mod tests {
         assert_eq!(e.line(), "environment: browser-vm · ready · /work · python3, tcc · saved 36 MB");
         e.runtimes = Some(Vec::new());
         assert!(e.line().contains(" · none of python3, node, bun, java, rustc, cargo, tcc, gcc on PATH · "), "{}", e.line());
+        // What is missing and can be added is said with its command; what is there is not offered.
+        assert!(
+            e.line().ends_with(
+                "\ninstall when needed: python3 with run(command=\"apk add python3\"), tcc with run(command=\"apk add tcc tcc-libs-static tcc-dev musl-dev\"); nothing else can be installed here (no git, no pip)"
+            ),
+            "{}",
+            e.line()
+        );
+        e.runtimes = Some(vec!["python3".into()]);
+        assert!(e.line().contains("\ninstall when needed: tcc with run(") && !e.line().contains("python3 with run("), "{}", e.line());
+        assert!(e.rows().iter().any(|(k, v)| *k == "can install" && v == "tcc (apk add tcc tcc-libs-static tcc-dev musl-dev)"));
         let h = Environment::host("macos", "/repo");
         assert_eq!(h.line(), "environment: host · ready · /repo");
     }
@@ -571,8 +630,14 @@ mod tests {
     fn roots_are_folders_of_work() {
         assert_eq!(dir(".").unwrap(), "/work");
         assert_eq!(dir("src/").unwrap(), "/work/src");
-        assert!(dir("/tmp").is_err());
+        assert!(dir("/tmp").unwrap_err().contains("is not in the workspace"));
+        assert!(dir("/workshop").is_err(), "a name that only starts like the workspace");
         assert!(dir("../x").is_err());
+        // The workspace by its full path is the workspace.
+        assert_eq!((folder("/work").unwrap(), folder("/work/").unwrap(), folder("/work/src/app").unwrap()), (".".into(), ".".into(), "src/app".to_string()));
+        assert_eq!((dir("/work").unwrap(), dir("/work/src").unwrap()), ("/work".to_string(), "/work/src".to_string()));
+        assert_eq!(rel("/work", "tree.py").unwrap(), "tree.py");
+        assert_eq!(rel("/work/src", "main.rs").unwrap(), "src/main.rs");
         assert_eq!(rel(".", "a/b.rs").unwrap(), "a/b.rs");
         assert_eq!(rel("src", "./main.rs").unwrap(), "src/main.rs");
         assert!(rel(".", "../etc/passwd").is_err());

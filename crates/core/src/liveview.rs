@@ -90,6 +90,21 @@ impl Live {
     }
 }
 
+/// The file engine `e` touched last: the path in the newest file call
+/// (open, focus, edit, save) of its answers. What a person following the
+/// work wants in front of them. `None`: it has made no file call yet.
+pub fn last_file(e: &Engine) -> Option<String> {
+    use crate::response::{ResponseFormat, Responses};
+    e.messages.iter().rev().filter(|m| m.role == crate::inference::Role::Assistant).find_map(|m| {
+        let answer = e.format.parse(&e.response, &m.text).ok()?;
+        let calls = crate::calls::parse(Responses::get(&answer, crate::turn::ACT)?).ok()?;
+        let path = calls.iter().rev().find(|c| crate::file::TOOLS.contains(&c.name.as_str()))?.arg("path")?;
+        // `open(path="a|b")` opens several: the last named is the newest.
+        let last = path.rsplit('|').next().unwrap_or(path).trim();
+        Some(last.trim_start_matches("./").to_string())
+    })
+}
+
 /// The artifacts of `e` that attach a live view, `(name, kind)`.
 pub fn developer(e: &Engine) -> Vec<(String, Live)> {
     crate::live::present(e).into_iter().filter(|(_, k)| !k.view().is_empty()).collect()
@@ -113,7 +128,8 @@ pub struct LiveView {
     pub parts: Vec<Part>,
     /// One per file artifact.
     pub roots: Vec<Root>,
-    /// Every open file of every file artifact, in their order.
+    /// Every open file of every file artifact: the one the engine touched
+    /// last first (`last_file`), then in the order they were opened.
     pub tabs: Vec<Tab>,
     /// Every session of every terminal artifact: running first.
     pub sessions: Vec<Session>,
@@ -295,6 +311,11 @@ pub fn build(e: &Engine, artifacts: &[ArtifactView], scope: Option<&str>, activi
     }
     // Running first; each artifact's own order (newest first) kept.
     sessions.sort_by_key(|s| !s.view.running);
+    // The file the engine touched last comes first: the first tab is the
+    // one a workbench shows, so the view follows the work.
+    if let Some(now) = last_file(e) {
+        tabs.sort_by_key(|t| t.path != now);
+    }
 
     let mut parts: Vec<Part> = shown.iter().filter_map(|v| v.kind).flat_map(|k| k.view().iter().copied()).chain(ALWAYS).collect();
     parts.sort();
@@ -528,6 +549,31 @@ mod tests {
         assert_eq!(lv.status.activity, "running tools: open");
         assert_eq!(lv.status.counts, "2 open · 1 unsaved · 1 running");
         assert_eq!(lv.status.gauge.as_ref().map(|g| g.0), Some(0.25));
+    }
+
+    #[test]
+    fn the_file_the_engine_touched_last_is_the_first_tab() {
+        use crate::inference::{Message, Role as Who};
+        let mut e = Engine::new("Builder", "", OpenAi::default());
+        e.response = crate::response::Responses::from_md(include_str!("../../../responses.md")).unwrap().0;
+        e.artifacts.insert("code".into(), "kind: file\nroot: .\nopen: a.py\nopen: b.py\nopen: c.py".into());
+        let disk = FakeDisk::with(&[("a.py", "a\n"), ("b.py", "b\n"), ("c.py", "c\n")]);
+        let at = Snapshots { clock: None, host: Some(&disk), family: None };
+        let order = |e: &Engine| {
+            let lv = build(e, &crate::inspect::artifacts(e, &at), None, &Activity::Idle, None);
+            lv.tabs.iter().map(|t| t.path.clone()).collect::<Vec<_>>()
+        };
+        // No file call yet: the order they were opened in.
+        assert_eq!((last_file(&e), order(&e)), (None, vec!["a.py".to_string(), "b.py".into(), "c.py".into()]));
+        let said = |e: &mut Engine, act: &str| e.messages.push(Message { role: Who::Assistant, text: format!("thought: x\nact: {act}") });
+        said(&mut e, "open(path=\"a.py|./c.py\"); run(command=\"ls\")");
+        assert_eq!(last_file(&e).as_deref(), Some("c.py"), "of several opened at once, the last named");
+        assert_eq!(order(&e), ["c.py", "a.py", "b.py"]);
+        // A later answer with no file call changes nothing; the next edit moves the view.
+        said(&mut e, "run(command=\"python3 c.py\")");
+        assert_eq!(last_file(&e).as_deref(), Some("c.py"));
+        said(&mut e, "edit(path=\"b.py\", old=\"b\", new=\"B\"); save(path=\"b.py\")");
+        assert_eq!(order(&e), ["b.py", "a.py", "c.py"]);
     }
 
     #[test]

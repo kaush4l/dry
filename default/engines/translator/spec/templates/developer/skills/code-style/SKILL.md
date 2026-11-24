@@ -10,8 +10,9 @@ description: Make the edits in the style of the code around them - naming, comme
    your habit.
 2. **Edit exactly.** `edit(path, old, new)` needs `old` to appear once.
    Take it from the file as the artifact shows it now, with its
-   indentation. Make one edit per change. `save(path)` when the file is
-   done. An unsaved edit is not a change.
+   indentation and without the line numbers. Make one edit per change.
+   `save(path)` when the file is done. An unsaved edit is not a change.
+   A new file is `edit(path, new)` with no `old`: `new` is its whole text.
 3. **Only what the plan names.** No renames, reformatting or "while I'm
    here" fixes. If you see a real problem elsewhere, write it in the
    notes for the report.

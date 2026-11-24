@@ -213,11 +213,34 @@ fn unescape(line: &str) -> String {
     out
 }
 
-/// The command as one short line, for results and messages.
+/// The command as one short line, for results and messages: its first
+/// line, and of one that is cut (long, or several lines) its end too,
+/// where a tool's inputs are (`python3 -c '…' 'the query'`).
 fn short(command: &str) -> String {
     let one = command.split('\n').next().unwrap_or("").trim();
-    let cut: String = one.chars().take(80).collect();
-    if cut.len() < one.len() || command.contains('\n') { format!("{cut}…") } else { cut }
+    if one.chars().count() <= 80 && !command.contains('\n') {
+        return one.to_string();
+    }
+    let head: String = one.chars().take(48).collect();
+    let all: Vec<char> = command.trim_end().chars().collect();
+    let tail: String = all[all.len().saturating_sub(30)..].iter().map(|c| if *c == '\n' { ' ' } else { *c }).collect();
+    format!("{head}…{tail}")
+}
+
+/// Most characters of a command the snapshot shows whole.
+const SHOWN_CHARS: usize = 400;
+
+/// The command as the snapshot shows it under a session: whole, or a long
+/// one (a skill tool's inline script) as its start and its end with how
+/// much was left out, so the prompt does not carry the script each step.
+fn shown(command: &str) -> String {
+    let all: Vec<char> = command.chars().collect();
+    if all.len() <= SHOWN_CHARS {
+        return command.to_string();
+    }
+    let head: String = all[..160].iter().collect();
+    let tail: String = all[all.len() - 160..].iter().collect();
+    format!("{head}\n… ({} characters not shown) …\n{tail}", all.len() - 320)
 }
 
 /// The last `n` lines of `text`, each as it ended up on screen (after the
@@ -261,7 +284,8 @@ impl RunJob {
     /// Run it and wait: its exit code and its output's last lines.
     pub fn wait(&self, host: &dyn Host) -> Result<(Option<i32>, String), String> {
         let code = host.run(&self.job())?;
-        Ok((code, host.tail(&self.job(), RESULT_LINES)))
+        // One line more than shown: `finish_run` marks a cut result.
+        Ok((code, host.tail(&self.job(), RESULT_LINES + 1)))
     }
 }
 
@@ -297,7 +321,11 @@ pub fn finish_run(text: &mut String, job: &RunJob, came: Result<(Option<i32>, St
     }
     *text = s.to_text();
     let (_, tail) = came?;
+    let cut = tail.lines().count() > RESULT_LINES;
     let tail = if tail.trim().is_empty() { "(no output)".to_string() } else { last_lines(&tail, RESULT_LINES) };
+    // A cut result says so: a model that reads 15 lines as the whole
+    // output ticks steps on lines it never saw.
+    let tail = if cut { format!("… earlier lines not shown (the terminal artifact shows the last {TAIL_LINES})\n{tail}") } else { tail };
     Ok(format!("session {} `{}`: {}\n{tail}", job.session, short(&job.command), status.text()))
 }
 
@@ -525,7 +553,7 @@ pub fn snapshot(engine: &str, artifact: &str, text: &str, host: &dyn Host) -> St
             Proc::Ended(code) => format!("ended, {} (not yet marked)", Status::ended(code).text()),
         };
         let callback = if x.mode == Mode::Start { ", a message when it ends" } else { "" };
-        out.push_str(&format!("\n\n#### session {} — {}, {how}{callback}\n$ {}\n{}", x.id, x.mode.as_str(), x.command, tail(x)));
+        out.push_str(&format!("\n\n#### session {} — {}, {how}{callback}\n$ {}\n{}", x.id, x.mode.as_str(), shown(&x.command), tail(x)));
     }
     let done: Vec<&Session> = s.sessions.iter().filter(|x| x.status != Status::Running).collect();
     if let Some(last) = done.last() {
@@ -534,7 +562,7 @@ pub fn snapshot(engine: &str, artifact: &str, text: &str, host: &dyn Host) -> St
             last.id,
             last.status.text(),
             elapsed(now - last.started),
-            last.command,
+            shown(&last.command),
             tail(last)
         ));
     }
@@ -846,7 +874,8 @@ pub(crate) mod tests {
             Err("read-only".into())
         }
         fn run(&self, job: &Job) -> Result<Option<i32>, String> {
-            self.logs.borrow_mut().insert(job.session, format!("compiling\nran {}\n", job.command));
+            let many = if job.command.contains("many") { (1..=20).map(|i| format!("line {i}\n")).collect() } else { String::new() };
+            self.logs.borrow_mut().insert(job.session, format!("{many}compiling\nran {}\n", job.command));
             let code = if job.command.contains("fail") { 1 } else { 0 };
             self.ended.borrow_mut().insert(job.session, Some(code));
             Ok(Some(code))
@@ -891,6 +920,9 @@ pub(crate) mod tests {
         assert_eq!(call("e", "term", &mut text, &c("start(command=\"cargo test\")"), &sh), Ok("session 3 `cargo test` started; a message comes when it ends".into()));
         assert!(call("e", "term", &mut text, &c("background(command=\"npm run dev\")"), &sh).unwrap().contains("no message when it ends"));
         assert!(call("e", "term", &mut text, &c("run()"), &sh).unwrap_err().contains("needs command"));
+        let cut = call("e", "term", &mut text, &c("run(command=\"many lines\")"), &sh).unwrap();
+        assert!(cut.starts_with("session 5 `many lines`: exit 0\n… earlier lines not shown (the terminal artifact shows the last 30)\nline 8\n"), "{cut}");
+        assert!(cut.ends_with("line 20\ncompiling\nran many lines"), "a cut result keeps its last 15 lines: {cut}");
         assert_eq!(*sh.started.borrow(), ["3 cargo test in .", "4 npm run dev in ."], "commands run in the root");
         assert!(text.contains("session: 3 start running 0 cargo test\nsession: 4 background running 0 npm run dev"), "{text}");
     }

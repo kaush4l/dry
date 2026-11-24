@@ -56,6 +56,7 @@ pub mod stream;
 pub mod stream_json;
 pub mod subscriptions;
 pub mod skill;
+pub mod skilltool;
 pub mod snapshot;
 pub mod spans;
 pub mod state;

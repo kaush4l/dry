@@ -49,6 +49,7 @@ The topology (owner, 2026-11-23):
 | CLI models (claude, codex, copilot) | ✅ | `core/cli.rs` (10 tests), `tools/cli.rs`; measured 2026-11-23: claude/haiku 2.2–3.8 s per turn ([engine-standard.md, CLI models](engine-standard.md#cli-models-built-coreclirs-toolsclirs)). Not in a browser page (a page cannot start a program) |
 | Evidence | ✅ | `core/evidence` (24 tests); [`evidence/summary.md`](../evidence/summary.md): 10 shots, 0 changed, pass. Not yet: native (GPUI) shots, full-page shots, images in the browser build ([evidence.md, Not yet](evidence.md#8-not-yet)) |
 | The shipped default (translator + developer) | ✅ | [default.md](default.md): `default/` is what a fresh state starts with (host, window, `dry`, the web build). `core/shipped.rs`, `core/kit.rs` tests, `engines` test for a child from a template; proved on a scratch project with claude/sonnet (triage → code → test, judged report). Skills from [skills-survey.md](skills-survey.md). With claude/haiku the loop runs but skips phases and invents facts |
+| The developer loop on a local model | ✅ | [loop/journal.md](loop/journal.md): Inkling-2-Mini on oMLX, natively and in the browser page; 25 answers and 4 slips before, 12–15 and 0–1 after (`docs/loop/runs/`). A skill can bring tools (`core/skilltool.rs`; the developer's `python`). Open: nothing starts work without a message; in the page the developer cannot look at a page it made |
 | Analytics | 🟡 | `core/spans.rs` (7 tests), `core/analytics.rs` (8 tests); views in HTML and GPUI. No end-to-end verification note in [analytics.md](analytics.md). Missing: the browser's `analytics` tool, GPUI session traces, evidence spans, schedule triggers |
 | Capabilities: compiled | ✅ | `core/capability` (16 tests): registry, `effective`, self-injection, `kind:` aliases, `uses:` |
 | Capabilities: declared | ✅ | the parser, argv safety, edge-triggered events; `dry-tools capability` tests; `capabilities/battery.md` works on this Mac; `gpio.md` and `sensors.md` probe absent with why |
@@ -57,11 +58,11 @@ The topology (owner, 2026-11-23):
 | Companion protocol and conformance | ✅ | Node, Python and Rust each pass `node conformance/run.mjs`, 40 of 40 (run for this page). The Python and Rust companions are uncommitted (see Known gaps) |
 | Folder workspace | ✅ | `core/workspace.rs` (6 tests): `Folder` is the `live::Host` over the companion's primitives; proved end to end on 2026-11-23 (restart, fresh browser, snapshot restore) ([web.md, The browser app and a folder on the person's computer](web.md#the-browser-app-and-a-folder-on-the-persons-computer)). The live view reads the folder by synchronous requests at each render |
 | `providers.json` | ✅ | the template at the repo root; `conformance/providers.test.mjs` covers port, cli, native, add and 409, for all three companions |
-| Browser container (v86) | 🟡 | a spike: Alpine in v86 on `#/container`, measured (boot 2.6 s, exec 11 ms) and shot by evidence ([container.md](container.md)). Not wired to `terminal` artifacts; no relay for networking; 32-bit only; `Local` and `Remote` backends are sketches |
+| Browser container (v86) | ✅ | the page's environment: Alpine in v86 behind the `file` and `terminal` artifacts (`dry_web::env`, [container.md](container.md)). Proved 2026-11-23 with a local model: python installed by the engine, a script written, run and reported, all in the page ([loop/journal.md](loop/journal.md) §9). 32-bit only; no git; a `run`'s output comes when it ends |
 | Web app (wasm) | ✅ | `crates/web`; `idb.rs` tests run in a real browser by hand ([browser.md, Tests](browser.md#tests)); evidence shoots landing, Home, an engine, Settings and the container. The remote-host client (`TextStore` and `Transport` over HTTP) is not built |
 | GPUI | 🟡 | `crates/gpui` (1 test runs, 11 ignored need a local model). Its real-model checks are recorded in docs, but there are no screenshots of it (evidence needs a bundled app). Voice recording is not wired |
 | Scenes and the cat | 🟡 | `core/scene` (24 tests, fake clock); the cat, terminal and abyss scenes draw in GPUI with mood and pointer. In the browser the canvas draws the scene, but the code passes a fixed `Mood::Idle` and no pointer, so the cat does not react there. The server's HTML draws no scene |
-| Themes | 🟡 | `core/theme.rs` (12 tests); `default`, `cat`, `terminal`, `abyss`. Editing themes from a host page or the browser is off. Motion tokens beyond `motion` are not there |
+| Themes | 🟡 | `core/theme.rs` (12 tests); `default`, `cat`, `terminal`, `abyss`, `bolt` (flat; the live view wears it always). Editing themes from a host page or the browser is off. Motion tokens beyond `motion` are not there |
 | Pages publishing | ✅ | [`.github/workflows/pages.yml`](../.github/workflows/pages.yml); the run of 2026-11-23 04:14 UTC passed and Pages reports `built` at https://kaush4l.github.io/dry/. It was built from `origin/main` (`b2baf24`), not this working tree |
 
 ## Parity tables
@@ -213,8 +214,10 @@ In order. Each line: what, then where it comes from.
 
 **Not built, from the docs' "Not yet" lists and the code**
 
-- Alerts never fire (`core/alert.rs`: "Firing is not built yet"); no
-  schedule triggers.
+- Alerts fire (built 2026-11-23: `alert::settle` on the callbacks tick, the
+  `alert` tool; docs/engine-standard.md, `kind: alerts`). Still not built:
+  `watch` triggers, firing while no shell runs (`dry alerts`), and a
+  schedule trigger in the analytics spans.
 - No person-approval for actuators; push and clone use an interim
   confirm dialog. Session approvals are lost when the host restarts. A
   parent cannot decide its child's approvals.

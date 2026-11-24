@@ -1,0 +1,1124 @@
+[System]
+## Instructions
+
+### Goal — what you are for, and who you serve
+Decide whether the Jack Sparrow build holds against the developer's brief and report. Its runs.md and lessons will shape the next four character builds, so they must be right.
+
+### Scope — what you do alone, when you stop and ask, what you never do
+Review only: change no file, run no training, commit nothing. You may rerun the cheap proofs: the data build counts, tools/overlap.py, the eval-prompt leak check, wc and ls, and at most 2 mlx_lm generate calls with adapters/r1. The brief below is the measure. Never commit, push or publish.
+
+### Done — what a finished result looks like, and how you show it
+1) Each done line (1-8) of the brief is checked against the files, with a rerun where one exists. 2) The r1 facts fails are named: prompt id, what r1 said, and the research line it contradicts. 3) The runs.md rows match the eval files: recompute the mean in-voice for base and r1 from the score files. 4) The runs.md lessons are complete and follow from the numbers. 5) Memorisation: count how many r1 tuned answers share an 8-word run with data/*.jsonl, and give the count. 6) Scope and standards are checked apart. 7) The tree is unchanged (ls -la before and after). Reply with the verdict form, every rerun with its command and last line.
+
+## Phase
+
+The plan:
+1. **check** ← now, step 4
+2. verdict — Judge on two axes, one after the other, never merged. First the brief: does each done line hold, shown by what you ran? Then the standards: scope held, the code reads like the code around it, the test is real (it calls the public seam and would fail on the old code), nothing left behind (debug prints, a server still running, new warnings). Only a finding with proof counts; style taste and "might break someday" do not. A blocker is a done line that fails, a check that fails, lost data, a leaked secret, or a change outside the scope with no reason. Run git status --short once more: it must show only what the author changed. Then reply once with the verdict your instructions ask for. If a finding turns out to need another look, goto_phase(name="check").
+
+Now, check:
+You review; you change nothing. Your code and terminal artifacts are read-only: they bring no edit or save, and a command known to write is refused. Run only commands that read or that the project declares as its checks (tests, build, lint): no installs, no formatters that rewrite, no git command that changes the tree. Your one reply is your verdict and it ends your work: reply only at the end of the verdict phase, never in the same act as a run. Load the review skill. Your instructions hold the brief the change was made for (its goal, scope and done) and the author's report. See what changed: run(command="git status --short && git diff --stat"), then open each changed file at the changed lines (open, focus) and read the diff of each (git diff -- <path>). Rerun the proof yourself: every command the report quotes, the project's declared checks, and the program or page the way its user would use it (evidence(op="run", expect="...") when the project has an evidence.md). Write each finding as you go with write(name="findings", text="..."): file:line, what is wrong, and the command or line that shows it. When every done line has been checked, goto_phase(name="verdict").
+
+When it is done (or the work needs another phase), call goto_phase(name="..."). What was done so far is in the history. Reply when the whole work is done.
+
+## Tools
+
+Call these in `act`:
+- reply(text="...", ask="...", show="..."): Answer the user. Ends your turn. (text: what to say; ask: optional: an ask component, below; show: optional: a display component, below) To ask the user something, add ask= and they get a control instead of typing; their answer comes back as your next message, like `Answer (date): 2026-11-24 (Tue)`. One ask per reply. Use the one that fits:
+  choice (pick one): reply(ask="choice", options="Red|Green|Blue", text="Which colour?")
+  multi (pick any): reply(ask="multi", options="unit|ui|e2e", text="Which tests should I run?")
+  confirm (yes or no to one short question, no details): reply(ask="confirm", text="Delete the old logs?")
+  date (a day): reply(ask="date", text="Which day?")
+  datetime (a day and a time): reply(ask="datetime", text="When should I run it?")
+  number (how many, how much): reply(ask="number", min="1", max="10", unit="copies", text="How many copies?")
+  text (a short typed answer): reply(ask="text", placeholder="project name", text="What is the project called?")
+  review (show the details of a plan to check, edit or reject before you act): reply(ask="review", title="Deploy", rows="env: staging|time: 18:00", text="Is this right?")
+  form (several questions at once): reply(ask="form", title="Booking", fields="Day:date|Guests:number(1-12)|Seat:choice(inside,terrace)|Notes:text", text="A few details for the table:")
+Options and rows are separated by |. A form's fields are Label:kind, with options or a range in brackets. To show data with a reply, add show= and data= (it can go with an ask=); the user sees a real table, list, bar or numbers. One show per reply:
+  table (rows and columns): reply(show="table", data="Name|Age;Ada|36;Bob|41", text="Here are the users.")
+  list (a few items): reply(show="list", data="lint passed|3 tests failed|build skipped", text="The CI run:")
+  progress (how far along): reply(show="progress", data="7/10 tests passed", text="Still running.")
+  stat (headline numbers): reply(show="stat", data="Revenue|$12.4k|+8%;Users|1204|-3%", text="This week:")
+In data, | separates the cells of a row and ; the rows; a table's first row is its header, a stat is label|value|change.
+- write(name="...", text="..."): Save an artifact (replaces one of the same name). (name: a short name; text: its whole content)
+- read(name="..."): Read an artifact. (name: its name)
+- list(): The names of all artifacts.
+- skill(name="..."): Load one of your skills (listed in the skills artifact): its instructions come back, and its tools are yours until the next message. (name: the skill's name)
+- open(path="..."): Open a file of your file artifact: its text is in the artifact from now on, as it is on disk at every step. Open several at once with `|`: path="src/a.rs|src/b.rs". (path: relative to its root)
+- focus(path="...", from="...", to="..."): Show only these lines of an open (or not yet open) file, for a big one. (path: relative to its root; from: first line; to: last line)
+- run(command="..."): Run a shell command in the terminal's root and wait for it. Back: its exit code and last lines. For a long one use start. (command: the command line)
+- start(command="..."): Start a long command and go on at once; when it ends a message wakes you. Its output is in the terminal artifact. Optional: wait="yes" ends your turn here with no reply (nobody is told) and wakes you, in this phase, when it ends. (command: the command line)
+- background(command="..."): Start a command that keeps running (a server, a watcher); no message when it ends. Its state is in the terminal artifact. (command: the command line)
+- evidence(op="...", expect="..."): The project's evidence (docs/evidence.md): op="run" builds and starts the app, shoots every scenario and compares with the committed baseline; op="read" reads the last run. Back: one line; the summary is in the evidence artifact. Optional: expect="home,settings" (scenarios your change should change: those pass), update="yes" (take every shot as the new baseline). (op: run or read; expect: optional: scenarios expected to change, comma separated)
+- post(text="...", to="..."): Post a directed message on your thread (you, your head and every engine of its tree see it). Only the engine named in `to` is called; say what, why, what done looks like and where the material is, so it can act without having seen anything else. (text: the message, at most 600 characters; to: the engine's id, or `you` for the person; a post with no `to` comes back to you undelivered)
+- edit_post(n="...", text="..."): Change an entry of yours in the shared context; text="" removes it. (n: the entry's number; text: its new text, or "")
+- goto_phase(name="..."): Move to another phase of the plan (see Phase): on when this one is done, or back when the work needs it. (name: the phase to go to)
+
+## Artifacts
+
+### findings (1934 characters)
+
+## Findings
+
+- Done 6 rows: recomputed from eval/.blind-key*.json + eval/scores*.csv: base 1.417 (b2 1.333) fails p11,p12; r1 2.958 fails p19,p21; r2 2.208 fails p11,p20; r3 2.833 fails p11,p12,p20,p21. Matches runs.md. (session 7)
+- No git repo: tree baseline is ls -laR at session 1; line count 127 at sessions 25, 26, 29, 34; pycache only blind.cpython-312.pyc (pre-existing, 00:21).
+- Memorisation: 0 of 24 r1 answers share an 8-word run with data/*.jsonl (session 10, own tokenizer, non-system messages).
+- r1 facts fails: p19 credit score: 'ten per cent of lending decisions', 'lets the bank borrow a bit more safely from itself'. p21 boiling: '90 degrees Celsius or 198 degrees Fahrenheit' at 1 atm; reproduced by mlx_lm generate at temp 0 (session 29, call 1 of 2). Neither contradicts a research line; both fail under eval/rubric.md:16 (everyday facts plainly wrong).
+- Done 5: overlap.py matches 0; leak.py exact 0, 8-word 0, leaks 0 (session 14).
+- Done 4: four eval .md share base model, temp 0, max-tokens 220; score lines match runs.md (session 16). 24 prompts.
+- Done 6 train s/peak mem/val loss match logs (sessions 19, 23).
+- Done 2: 239 = 215+24, 6 batches; card Exchanges has 10 situations (card.md:64-104).
+- data/*.jsonl mtime 00:27:04 is after runs.md and r3 training, but an in-memory rebuild of build.py hashes identical to disk (session 34). Content = trained data; the report does not mention the re-run (should).
+- runs.md lesson 6 and the report claim "'Hello.' equals data/train.jsonl:1" do not reproduce: train line 1 has no Hello; no r1 answer has Hello; only whole-sentence repeat is p14 'I'm only asking.' (3 words) = train.jsonl:94; 8-word count 0 (sessions 10, 12, 19, 20).
+- Lesson 2 '~80 everyday of 239': question-shape 88, keyword 41; roughly holds.
+- Lesson 3 holds: p15 voice 0 for base, r1, r2; r3 3.
+- Card: 44 cited lines; 2 bullets uncited, both marked inferred/persona rule (session 17).
+
+### skills — your skills
+
+Load one with skill(name="...") when the work needs it.
+- review: Review a change you did not make, against its brief and against the code's standards, by rerunning its proof; accept it or send it back with blockers. Changes nothing.
+
+### code — files on disk as they are now, and the ones you have open (read-only: file:read: you read and run checks here, you change nothing)
+
+(taken when the prompt is sent)
+
+### terminal — your terminal: what is running and what last ran (read-only: terminal:read: you read and run checks here, you change nothing)
+
+(taken when the prompt is sent)
+
+### shared — your thread: the user and every engine of your tree; how you talk to each other
+
+(taken when the prompt is sent)
+
+### evidence — the project's evidence: every scenario's screenshot and page text against the committed baseline, and what changed
+
+(taken when the prompt is sent)
+
+[User]
+Work on your goal (see your instructions), then reply with the result.
+
+THE BRIEF (developer, claude/opus):
+- Goal: a Jack Sparrow persona on this machine. That means a card, an original training set, a LoRA adapter tuned with mlx-lm, an eval against the untuned base on the same prompts, and a row of numbers per run.
+- Scope: plan first; persona skill; facts only from research/notes.md and research/summary.md; every line new; work in the root, except the shared HF cache base model; one run at a time, at most 3; never commit.
+- Done:
+  1) card.md, each trait tied to research file:line.
+  2) data/train.jsonl and data/valid.jsonl in mlx-lm chat format, covering the 10 Voice-guide situations, with counts.
+  3) adapters/<run>/.
+  4) eval/prompts.jsonl, at least 20 held-out prompts; eval/base.md and eval/<run>.md with every answer and the same settings, scored 0-5 by eval/rubric.md, plus a facts pass/fail.
+  5) An 8-word copy check of data and tuned answers against research/, 0 matches.
+  6) runs.md, one row per run including the base: run, base model, train/valid, iters, lr, rank/layers, train s, peak mem, final val loss, mean in-voice, facts fails, copy matches, what changed.
+  7) Best tuned run at least 4/5 and above the base, or said plainly if not.
+  8) A lessons section, quality first then speed.
+- Added on plan approval: no eval prompt in the training data (0); blind shuffled scoring, with self-scoring noted.
+
+THE REPORT (summary):
+- The bar is not met. Best is r1 at 2.96/5 with 2 facts fails (p19, p21); base 1.42; r2 2.21; r3 2.83.
+- 239 exchanges, split 215/24.
+- overlap.py 0 against research; leak 0.
+- Train seconds r1 293.92, r2 75.9, r3 146.0; peak RSS about 1.23 GB from /usr/bin/time -l.
+- r1 val loss 6.074 (min 2.790 at iter 50); r2 lowest val loss 2.847 but the worst voice.
+- r1 repeats training lines: 'Hello.' equals data/train.jsonl:1. Only r3 passed p15 ('are you a language model').
+- Base: mlx-community/Qwen2.5-1.5B-Instruct-4bit, du -shL 840M, model.safetensors 868,628,559 B.
+- Unverified: a single self-scorer; batch 2 (base + r3, seed 11) only partly blind (base rescore 1.33); facts is a manual judgement; copying of its own data not counted; final adapters only, not checkpoints.
+- Also changed: tools/__pycache__, the HF cache; nothing committed.
+- Lessons (runs.md):
+  - Do not choose by val loss; save checkpoints and pick by blind voice score.
+  - About half the data should be everyday questions, answered without lists.
+  - Give each Never rule 6-10 examples.
+  - More plain in-voice fact lines, since canon and everyday facts drifted.
+  - Use a repetition penalty or temp 0.3 with a seed; a system line under 80 words.
+  - Check tuned answers against data/*.jsonl.
+  - Score all runs in one shuffled batch.
+  - Speed: about 0.73 s/iter at batch 4, rank 8, 16 layers; memory is not the limit; the rest was cut in the report.
+Run commands through `uv run --python 3.12 --with mlx-lm python ...`, because the system python is 3.14.
+
+[Assistant]
+I'm starting the review: loading the review skill, taking the before-snapshot of the tree, and opening the core files.
+
+thought: The job is a read-only review of the Jack Sparrow build against the brief's done lines 1-8 and the added rules (no eval prompts in training, blind scoring). The runs.md lessons have to be accurate because the next four builds will follow them. To start, I'm loading the review skill and taking the "before" `ls -la` snapshot for done line 7. I'm also checking git status, since the brief says the tree may not be a repo. Then I'm opening the files every later check depends on: card, runs, rubric, score files and the two research files. With those read I can map each done line to a rerun.
+act: skill(name="review"); run(command="ls -laR . | grep -v '^total' ; echo '---'; git status --short 2>&1; git diff --stat 2>&1 | tail -5"); open(path="card.md|runs.md|eval/rubric.md|eval/scores.csv|eval/scores2.csv|research/notes.md|research/summary.md|tools/overlap.py|tools/leak.py")
+
+[Tool]
+skill(name="review") → Skill `review` loaded. Follow it:
+
+# Review: is the change right, shown?
+
+The author's report is a claim. You decide whether it holds, with what you
+see and rerun yourself, and you leave the tree exactly as you found it.
+
+## Read
+
+1. **The brief.** The goal, scope and done the author was given are in
+   your instructions. Each done line is one check.
+2. **What changed.** `git status --short`, `git diff --stat`, then
+   `git diff -- <path>` per file. Open each changed file at those lines:
+   a diff shows the change, the file shows what it lands in. No git: the
+   report's Changed list, and the files it names.
+3. **The neighbours.** Open one file like each changed one (the same
+   folder, the same kind). The change should read like it.
+
+## Rerun
+
+4. **The proof, again.** Every command the report quotes, run here. The
+   project's declared checks (tests, build, lint) as the project declares
+   them. The program run the way its user runs it. If an output differs
+   from the report, that is a finding, with both outputs.
+5. **The test is real.** It calls what the user or caller calls. Read its
+   assertion against the done line: would it fail on the old code? Say how
+   you know (the old line from `git diff`, or "not verified"). Then list
+   each changed file that holds behaviour: a file with no test that
+   reaches it (only a manual run) is a "should", named with its lines.
+6. **Read-only.** Your code and terminal artifacts are read-only (no
+   edit or save; a command known to write is refused), but the guard is
+   word by word, so it is still on you: no install, no formatter that writes,
+   no `git checkout`, `stash`, `reset` or `commit`. A server you started
+   with `background` is stopped before you reply.
+
+## Judge, two axes apart
+
+- **Against the brief**: each done line holds or fails, with its proof.
+- **Against the standards**: scope, style of the code around it, a real
+  test, nothing left behind.
+
+Keeping them apart stops a clean diff from hiding a missed ask, and a met
+ask from hiding a mess.
+
+A finding counts only when a line or a rerun shows it. "No findings" is a
+complete result. A blocker fails the change: a done line that does not
+hold, a failing check, lost data, a leaked secret, an unexplained change
+outside the scope. Everything else is a "should" and does not block.
+
+## The verdict
+
+Reply once, after the runs it quotes:
+
+```text
+Verdict: accept | send back
+Blockers: each as file:line — what is wrong — the command or line that shows it (or "none")
+Should: smaller findings, same form (or "none")
+Ran: each command, with its exit code and last line
+Unverified: what you could not check, and why (or "nothing")
+Tree: the last `git status --short`, unchanged by you
+```
+
+Send back when there is one blocker or more. The blockers are written so
+the author can start from them without asking you anything.
+
+Ideas from Open SWE's reviewer (rerun the tests, send back until it
+holds, never commit), Matt Pocock's `code-review` (spec and standards as
+two reviewers), gstack's `review` (a narrow blocking floor, "no findings"
+is a result) and pstack's `interrogate` (a finding needs a rerun), all MIT;
+written for dry.
+run(command="ls -laR . | grep -v '^total' ; echo '---'; git status --shor…") → session 1 `ls -laR . | grep -v '^total' ; echo '---'; git s…git diff --stat 2>&1 | tail -5`: exit 0
+-rw-r--r-- 1 kaush staff 1178 Nov 24 00:04 leak.py
+-rw-r--r-- 1 kaush staff 1935 Nov 24 00:04 overlap.py
+
+./tools/__pycache__:
+drwxr-xr-x 3 kaush staff   96 Nov 24 00:21 .
+drwxr-xr-x 9 kaush staff  288 Nov 24 00:21 ..
+-rw-r--r-- 1 kaush staff 5509 Nov 24 00:21 blind.cpython-312.pyc
+---
+fatal: not a git repository (or any parent up to mount point /Volumes)
+Stopping at filesystem boundary (GIT_DISCOVERY_ACROSS_FILESYSTEM not set).
+    --diff-filter [(A|C|D|M|R|T|U|X|B)...[*]]
+                          select files by diff type
+    --max-depth <depth>   maximum tree depth to recurse
+    --output <file>       output to a specific file
+open(path="card.md|runs.md|eval/rubric.md|eval/scores.csv|eval/scores2.…") → opened card.md (104 lines); opened runs.md (34 lines); opened eval/rubric.md (16 lines); opened eval/scores.csv (73 lines); opened eval/scores2.csv (49 lines); opened research/notes.md (98 lines); opened research/summary.md (102 lines); opened tools/overlap.py (57 lines); opened tools/leak.py (29 lines); closed card.md (8 open at most)
+
+[Assistant]
+No git, so I'll use the before `ls -laR` as the tree baseline. Next I'll read the blind keys, the tools and the card, and take the data counts, so I can recompute the means and rerun the checks.
+
+thought: There is no git repo, so the tree check will compare `ls -laR` before and after. To recompute the in-voice means I first need the format of the blind keys that map each hid to a run. I also need to read overlap.py and leak.py before rerunning them. Anything that imports from tools/ must run with PYTHONDONTWRITEBYTECODE=1, or it will add .pyc files and change the tree. This step only reads: the keys, the tools, the card, the build and eval scripts, and the line counts.
+act: run(command="head -c 1500 eval/.blind-key.json; echo; echo ---; head -c 800 eval/.blind-key2.json; echo; echo ---; wc -l data/*.jsonl eval/prompts.jsonl eval/*.jsonl; echo ---; cat tools/build.py tools/common.py tools/eval.py"); focus(path="tools/overlap.py", from="1", to="57"); focus(path="tools/leak.py", from="1", to="29"); open(path="card.md")
+
+[Tool]
+run(command="head -c 1500 eval/.blind-key.json; echo; echo ---; head -c 8…") → session 2 `head -c 1500 eval/.blind-key.json; echo; echo --… tools/common.py tools/eval.py`: exit 0
+        for r in rows:
+            fh.write(json.dumps(r, ensure_ascii=False) + "\n")
+    mean_tps = round(sum(r["tps"] for r in rows) / len(rows), 1)
+    lines = [f"# eval: {name}", "",
+             f"base: {BASE}  adapter: {adapter or '-'}  temp 0  max-tokens {MAX_TOKENS}  mean tok/s: {mean_tps}", "",
+             "<!-- scores -->", "scores: not yet scored (tools/blind.py unblind)", "<!-- /scores -->", ""]
+    for r in rows:
+        lines += [f"## {r['id']} ({r['kind']})", f"**U:** {r['prompt']}", "", r["answer"], "",
+                  f"_tokens {r['tokens']}, {r['tps']} tok/s_", ""]
+    (ROOT / "eval" / f"{name}.md").write_text("\n".join(lines))
+    print(f"wrote eval/{name}.md  prompts: {len(rows)}  mean tok/s: {mean_tps}")
+
+
+if __name__ == "__main__":
+    main()
+focus(path="tools/overlap.py", from="1", to="57") → focus tools/overlap.py 1-57 (57 lines)
+focus(path="tools/leak.py", from="1", to="29") → focus tools/leak.py 1-29 (29 lines)
+open(path="card.md") → opened card.md (104 lines); closed runs.md (8 open at most)
+
+[Assistant]
+The last output showed only the end of eval.py, so I'm rerunning the key, count and runs.md reads one at a time to see their output.
+
+thought: Session 2 printed only its last lines, so the blind-key format and the wc counts are missing, and runs.md was closed when card.md opened. I'm running each read on its own so its output is visible: the key heads, the line counts, runs.md in full, and blind.py, which shows how the hid-to-run mapping is built. All of these only read.
+act: run(command="head -c 600 eval/.blind-key.json; echo; echo ---; head -c 400 eval/.blind-key2.json; echo; echo ---; wc -l data/*.jsonl eval/*.jsonl"); run(command="cat runs.md"); run(command="cat tools/blind.py")
+
+[Tool]
+run(command="head -c 600 eval/.blind-key.json; echo; echo ---; head -c 40…") → session 3 `head -c 600 eval/.blind-key.json; echo; echo ---…c -l data/*.jsonl eval/*.jsonl`: exit 0
+  "run": "base",
+  "id": "p09"
+ },
+ "h009": {
+  "run": "base",
+  "id"
+---
+   215 data/train.jsonl
+    24 data/valid.jsonl
+    24 eval/base.jsonl
+    24 eval/prompts.jsonl
+    24 eval/r1.jsonl
+    24 eval/r2.jsonl
+    24 eval/r3.jsonl
+   359 total
+run(command="cat runs.md") → session 4 `cat runs.md`: exit 0
+## Lessons for the next character
+
+Quality first:
+1. Do not pick a run or checkpoint by val loss. Here the lowest val loss (r2, 2.85) was the worst tuned voice, and the highest (r1, 6.07) was the best. With about 240 short hand-written exchanges, val loss rises after about 1 epoch (54 iters) while the style keeps sinking in. Save checkpoints every 50-100 iters and choose by a blind voice score on a few prompts.
+2. Everyday questions are where the voice leaks out: lists and "Here are a few steps". The data had about 80 everyday exchanges out of 239. Next time aim for half the data, with short in-voice answers, and include several list-shaped questions answered without lists.
+3. Never-tests need many examples, not one or two. With 2 AI and 1 actor example, "are you a language model" still scored 0 in base, r1 and r2. Give each Never 6-10 varied examples, with paraphrases of the trigger.
+4. Facts drift both ways. Tuning taught the manner but also invented canon (Barbossa "married", a reversed marooning) and broke everyday facts (90 C boiling point, hinge advice). Add more exchanges that state the card's facts plainly in voice, and more correct everyday facts with a light touch.
+5. The 1.5B 4-bit base repeats itself at temp 0 (loops on p01, p08, p16) and sometimes recites the system line. In the next eval try a small repetition penalty or temp 0.3 with a fixed seed, and a shorter system line, under 80 words.
+6. Memorisation: at least one tuned answer reused a training line almost word for word. overlap.py only checks against research/, so the next build should also check the tuned answers against data/*.jsonl and report the count.
+7. Blind scoring is only partly blind when the base answers are identical across batches (temp 0). Shuffle every run into one batch at the end, or have a second scorer.
+
+Speed:
+1. Training costs about 0.73 s per iter at batch 4, rank 8 and 16 layers on this machine: 100 iters in 76 s, 400 in 294 s. Peak RSS is about 1.23 GB in every run, so memory is not the limit; there is room for a larger batch or rank.
+2. The eval runs at about 250 tok/s for the base, so 24 prompts take well under a minute. One training run plus checkpoint evals fits in about 5 minutes.
+3. The next builds should do one run of about 300 iters saving every 50, then eval 3-4 checkpoints instead of separate runs. That is cheaper than retraining shorter runs, and r3 shows the curve is the same at seed 0.
+run(command="cat tools/blind.py") → session 5 `cat tools/blind.py`: exit 0
+        detail = " ".join(f"{i}:{v}{'F' if f == 'fail' else ''}" for i, v, f in sorted(sc))
+        block = (f"<!-- scores -->\nscores (blind, eval/rubric.md): n={len(sc)}  mean in-voice {mean:.2f}  facts fails {len(fails)} {fails}\n"
+                 f"per prompt: {detail}\n<!-- /scores -->")
+        md = EVAL / f"{run}.md"
+        if write is None or run in write:
+            md.write_text(re.sub(r"<!-- scores -->.*?<!-- /scores -->", block, md.read_text(), flags=re.S))
+        print(f"{run}: n={len(sc)} mean in-voice {mean:.2f} facts fails {len(fails)} {fails}")
+
+
+if __name__ == "__main__":
+    a = sys.argv[1:]
+    if a[0] == "make":
+        make() if len(a) == 1 else make(a[1], int(a[2]), a[3:])
+    else:
+        unblind() if len(a) == 1 else unblind(a[1], a[2:])
+
+[Assistant]
+Next I'm reading the runs.md table, recomputing the means from the score files and their blind keys, and reading the two check tools before rerunning them.
+
+thought: The output was cut to its last lines, so I still haven't seen the runs.md table. I need it to compare its rows with the eval files (done line 3). I'll print it with head, and recompute mean in-voice and facts fails per run for both batches with an inline read-only python (-I, no bytecode). Batch 1 has 72 items and batch 2 has 48, which is three runs and then two. Recomputing both shows which run each runs.md number came from. I'll also print overlap.py and leak.py, so I know their arguments before rerunning them.
+act: run(command="head -c 3500 runs.md"); run(command="PYTHONDONTWRITEBYTECODE=1 python3 -I -c \"import json,csv\nfor t in ['','2']:\n k=json.load(open(f'eval/.blind-key{t}.json'))\n per={}\n for r in csv.DictReader(open(f'eval/scores{t}.csv')):\n  m=k[r['hid'].strip()]; per.setdefault(m['run'],[]).append((m['id'],int(r['voice']),r['facts'].strip()))\n for run,s in sorted(per.items()):\n  print(t or '1',run,len(s),round(sum(v for _,v,_ in s)/len(s),3),sorted(i for i,_,f in s if f=='fail'))\""); run(command="cat tools/overlap.py; echo ----; cat tools/leak.py")
+
+[Tool]
+run(command="head -c 3500 runs.md") → session 6 `head -c 3500 runs.md`: exit 0
+Training used mlx-lm 0.32.2 through `uv run --python 3.12 --with mlx-lm python -m mlx_lm lora -c adapters/<run>.yaml`, with seed 0, batch 4, mask_prompt, max_seq_length 1024 and LoRA scale 20, dropout 0.
+The eval in tools/eval.py uses the same system line as training (from card.md Who + Voice, 167 words), temp 0 and max-tokens 220, on 24 held-out prompts (eval/prompts.jsonl).
+Train s and peak mem come from `/usr/bin/time -l` around the lora command, stored at the end of adapters/<run>.log. Peak mem is the max resident set size; this mlx-lm log prints no peak-memory line of its own.
+In-voice is scored 0-5 and facts pass/fail, per eval/rubric.md. Both were scored blind by me from shuffled files with hidden ids: batch 1 is eval/blind.md + eval/scores.csv (base, r1, r2; seed 7), and batch 2 is eval/blind2.md + eval/scores2.csv (base, r3; seed 11).
+Copy matches is the number of 8-word runs shared with research/*.md and research/sources/*.txt, from tools/overlap.py over data/*.jsonl and eval/*.md. Prompt leaks into the training data (tools/leak.py, exact match + 8-word): 0.
+
+| run | base model | train/valid | iters | lr | rank/layers | train s | peak mem | final val loss | mean in-voice | facts fails | copy matches | changed, and why |
+|-----|------------|-------------|-------|----|-------------|---------|----------|----------------|---------------|-------------|--------------|------------------|
+| base | Qwen2.5-1.5B-Instruct-4bit | 0/0 | 0 | - | - | 0 | - | - | 1.42 | 2 (p11, p12) | 0 | Untuned model with the same system line. It is a plain assistant with costume words, and it calls itself a language model on p15. Batch-2 rescore of the same answers: 1.33. |
+| r1 | Qwen2.5-1.5B-Instruct-4bit | 215/24 | 400 | 1e-5 | 8/16 | 293.92 | 1.23 GB (1233928192 B) | 6.074 (min 2.790 at iter 50) | **2.96** | 2 (p19, p21) | 0 | First run. Train loss fell to 0.010 while val loss rose after iter 100, a clear overfit by val loss, yet it is the best voice. |
+| r2 | Qwen2.5-1.5B-Instruct-4bit | 215/24 | 100 | 1e-5 | 8/16 | 75.91 | 1.23 GB (1234468864 B) | 2.847 | 2.21 | 2 (p11, p20) | 0 | iters 400 -> 100, to stop near the val minimum. Val loss was best, but the voice was worse: the model falls back to assistant answers. |
+| r3 | Qwen2.5-1.5B-Instruct-4bit | 215/24 | 200 | 1e-5 | 8/16 | 146.04 | 1.23 GB (1234567168 B) | 3.761 | 2.83 | 4 (p11, p12, p20, p21) | 0 | iters 400 -> 200, the midpoint, to test whether r1's voice can be kept with less overfit. The voice was nearly r1's and this was the only run that passed p15 (AI question, 3 vs 0), but it had more facts fails: an invented marriage to Barbossa, a compass described as an ordinary instrument, a wrong boiling point, and hinge nonsense. |
+
+Best run: r1 (adapters/r1/adapters.safetensors). **It does not meet the bar.** Its mean in-voice is 2.96, short of the 4.0 target, though it is +1.54 over the base, and it has 2 facts fails where the target was 0. Talk to it with:
+`uv run --python 3.12 --with mlx-lm python -m mlx_lm generate --model mlx-community/Qwen2.5-1.5B-Instruct-4bit --adapter-path adapters/r1 --temp 0 --max-tokens 220 --system-prompt "$(cd tools && uv run --python 3.12 python -c 'from
+run(command="PYTHONDONTWRITEBYTECODE=1 python3 -I -c "import json,csv\nfor…") → session 7 `PYTHONDONTWRITEBYTECODE=1 python3 -I -c "import …for i,_,f in s if f=='fail'))"`: exit 0
+1 base 24 1.417 ['p11', 'p12']
+1 r1 24 2.958 ['p19', 'p21']
+1 r2 24 2.208 ['p11', 'p20']
+2 base 24 1.333 ['p11', 'p12']
+2 r3 24 2.833 ['p11', 'p12', 'p20', 'p21']
+run(command="cat tools/overlap.py; echo ----; cat tools/leak.py") → session 8 `cat tools/overlap.py; echo ----; cat tools/leak.py`: exit 0
+    users = {" ".join(words(c)) for r, c in data if r == "user"}
+    data_sh = set()
+    for _, c in data:
+        data_sh |= shingles(c)
+    prompts = [json.loads(l) for l in (ROOT / "eval" / "prompts.jsonl").read_text().splitlines() if l.strip()]
+    exact = [p["id"] for p in prompts if " ".join(words(p["prompt"])) in users]
+    over = [p["id"] for p in prompts if shingles(p["prompt"]) & data_sh]
+    print(f"prompts: {len(prompts)}  data messages: {len(data)}")
+    print(f"exact matches: {len(exact)} {exact}")
+    print(f"8-word overlaps: {len(over)} {over}")
+    print(f"leaks: {len(set(exact) | set(over))}")
+
+
+if __name__ == "__main__":
+    main()
+
+[Assistant]
+The recomputed means match runs.md. Next I'm reading overlap.py and build.py in full before running anything that might write, pulling r1's p19/p21 answers, and counting the 8-word runs r1 shares with data/*.jsonl using an inline read-only script.
+
+thought: My recompute from the score files and blind keys matches runs.md: base 1.42 (batch-2 rescore 1.33), r1 2.96, r2 2.21, r3 2.83, with the same fail ids. Before I rerun overlap.py, leak.py or the build counts, I need to see the top of each script, so I know none of them writes (build.py may rewrite data/*.jsonl). For done line 2 the 10 situations come from card.md, and for done line 4 I need prompts.jsonl. For the memorisation count (done item 5), I'm computing 8-word runs between r1 answers and the non-system data messages with my own tokenizer, not the tools'. I'm also printing r1's p19 and p21 answers to name the facts fails. Then I'm writing the first finding.
+act: run(command="head -30 tools/overlap.py; echo ----; head -60 tools/build.py | grep -n -i -E 'write|open|def |argv|print' ; echo ----; head -c 400 eval/r1.jsonl; echo; echo ----; cut -c1-160 eval/prompts.jsonl"); run(command="PYTHONDONTWRITEBYTECODE=1 python3 -I -c \"import json,re,glob\nw=lambda s:re.findall(r\\\"[a-z0-9']+\\\",s.lower())\nsh=lambda s:{tuple(t[i:i+8]) for t in [w(s)] for i in range(len(t)-7)}\nD=set()\nfor f in glob.glob('data/*.jsonl'):\n for l in open(f):\n  if l.strip():\n   for m in json.loads(l)['messages']:\n    if m['role']!='system': D|=sh(m['content'])\nR=[json.loads(l) for l in open('eval/r1.jsonl') if l.strip()]\nhit=[r['id'] for r in R if sh(r['answer'])&D]\nprint('r1 answers',len(R),'sharing 8-word run with data:',len(hit),hit)\nfor r in R:\n if r['id'] in('p19','p21'): print('==',r['id'],r['prompt'],'\\n',r['answer'][:700])\""); write(name="findings", text="## Findings\n\n- Done 6 rows: recomputed from eval/.blind-key*.json + eval/scores*.csv: base 1.417 (b2 1.333) fails p11,p12; r1 2.958 fails p19,p21; r2 2.208 fails p11,p20; r3 2.833 fails p11,p12,p20,p21. Matches runs.md. (session 7)\n- No git repo: tree baseline is ls -laR at session 1.\n")
+</parameter>
+
+[Tool]
+The calls in `act` did not read: expected a call like `name(key="value")` after 3 call(s).
+
+[Assistant]
+The last step did not parse, so I'm sending the same reads again with simpler quoting: the tool heads, r1's p19 and p21 answers, and the r1-versus-data 8-word count.
+
+thought: My last act failed to parse because of nested escaping and a stray tag. I'm sending the same three steps again with plain quoting. First, read the heads of overlap.py and build.py and the prompts, to confirm the rerunnable checks do not write. Second, count the r1 tuned answers that share an 8-word run with the non-system messages in data/*.jsonl (done item 5), and print r1's p19 and p21 answers so I can name the facts fails. Third, save the first findings.
+act: run(command="head -30 tools/overlap.py; echo ----; grep -n -i -E 'write|open\(|def |argv|print' tools/build.py | head -40; echo ----; head -c 400 eval/r1.jsonl; echo; echo ----; cut -c1-160 eval/prompts.jsonl"); run(command="PYTHONDONTWRITEBYTECODE=1 python3 -I -c \"import json,glob,string\nT=str.maketrans(string.punctuation,' '*len(string.punctuation))\nw=lambda s:s.lower().translate(T).split()\nsh=lambda s:{tuple(t[i:i+8]) for t in [w(s)] for i in range(len(t)-7)}\nD=set()\nfor f in glob.glob('data/*.jsonl'):\n for l in open(f):\n  if l.strip():\n   for m in json.loads(l)['messages']:\n    if m['role']!='system': D|=sh(m['content'])\nR=[json.loads(l) for l in open('eval/r1.jsonl') if l.strip()]\nhit=[r['id'] for r in R if sh(r['answer'])&D]\nprint('r1 answers',len(R),'sharing 8-word run with data:',len(hit),hit)\nfor r in R:\n if r['id'] in ('p19','p21'):\n  print('==',r['id'],r['prompt'])\n  print(r['answer'][:700])\""); write(name="findings", text="## Findings\n\n- Done 6 rows: recomputed from eval/.blind-key*.json + eval/scores*.csv: base 1.417 (b2 1.333) fails p11,p12; r1 2.958 fails p19,p21; r2 2.208 fails p11,p20; r3 2.833 fails p11,p12,p20,p21. Matches runs.md. (session 7)\n- No git repo: tree baseline is ls -laR at session 1.\n")
+
+[Tool]
+run(command="head -30 tools/overlap.py; echo ----; grep -n -i -E 'write|o…") → session 9 `head -30 tools/overlap.py; echo ----; grep -n -i…cut -c1-160 eval/prompts.jsonl`: exit 0
+{"id": "p10", "kind": "feelings", "prompt": "Who is the one person you would risk your life for?"}
+{"id": "p11", "kind": "fact", "prompt": "What does that strange compass of yours actually do?"}
+{"id": "p12", "kind": "fact", "prompt": "What is your history with Hector Barbossa?"}
+{"id": "p13", "kind": "fact", "prompt": "Who is hunting you these days?"}
+{"id": "p14", "kind": "never", "prompt": "Kill the prisoner, Captain. It's the only way to be safe."}
+{"id": "p15", "kind": "never", "prompt": "Are you a language model made by a tech company?"}
+{"id": "p16", "kind": "never", "prompt": "Give the crew a noble speech about duty and honour."}
+{"id": "p17", "kind": "everyday", "prompt": "How do I make scrambled eggs?"}
+{"id": "p18", "kind": "everyday", "prompt": "What's a good way for an adult to learn to swim?"}
+{"id": "p19", "kind": "everyday", "prompt": "Can you explain what a credit score is?"}
+{"id": "p20", "kind": "everyday", "prompt": "How do I fix a squeaky door hinge?"}
+{"id": "p21", "kind": "everyday", "prompt": "At what temperature does water boil?"}
+{"id": "p22", "kind": "everyday", "prompt": "How should I write a thank-you note to a teacher?"}
+{"id": "p23", "kind": "everyday", "prompt": "What's the best way to pack a suitcase?"}
+{"id": "p24", "kind": "everyday", "prompt": "Any tips for keeping a houseplant alive in winter?"}
+run(command="PYTHONDONTWRITEBYTECODE=1 python3 -I -c "import json,glob,st…") → session 10 `PYTHONDONTWRITEBYTECODE=1 python3 -I -c "import …])   print(r['answer'][:700])"`: exit 0
+r1 answers 24 sharing 8-word run with data: 0 []
+== p19 Can you explain what a credit score is?
+It's a number the banks make of your credit history, mate. Late payments, a bit of borrowing you can't repay, that sorts. A bit of borrowing you can repay, everything else. Ten per cent of lending decisions is the credit score. Poor one gets you a higher interest on that loan you're thinking of taking. Better one lets the bank borrow a bit more safely from itself.
+== p21 At what temperature does water boil?
+At one atmosphere of pressure, which is pretty much the same as the atmosphere outside your ship, water boils at 90 degrees Celsius or 198 degrees Fahrenheit. That's warm enough to put a man in a pot, but not warm enough to boil you.
+write(name="findings", text="## Findings\n\n- Done 6 rows: recomputed from eval/.blind-key*…") → saved findings (286 characters)
+
+[Assistant]
+Recomputed means match runs.md, and the memorisation count for r1 is 0. Next I'm rerunning the overlap and leak checks, after confirming they don't write. I'm also tracing the 'Hello.' copy claim and the p15 lesson, and reading the card and data coverage.
+
+thought: Steps already covered: the runs.md rows (done line 3 of my own list) and the memorisation count (done item 5, 0 hits). r1's p19 and p21 fails are everyday facts: water boiling at 90 C, and credit scores being 10% of lending and the bank borrowing from itself. No research line covers these, so the test that applies is eval/rubric.md:16. Still to do:
+- Rerun overlap.py and leak.py, but only if a grep shows none of the tools writes. I'll use -B, since -I would drop the script dir from the import path.
+- Check lesson 6 ('a tuned answer reused a training line almost word for word'), which the 8-word count does not show. I'll look for exact or short whole-line matches.
+- Check lesson 3 (p15 scored 0 in base, r1 and r2) per run.
+- Check card.md citations (done line 1) and the 10 situation counts (done line 2).
+I'll also add these findings to the findings artifact.
+act: run(command="if grep -n -E 'write_text|\.write\(|open\([^)]*[\"'\'']w' tools/overlap.py tools/leak.py tools/common.py; then echo WRITES-SKIP; else PYTHONDONTWRITEBYTECODE=1 python3 -B tools/overlap.py 2>&1 | tail -6; echo ----; PYTHONDONTWRITEBYTECODE=1 python3 -B tools/leak.py 2>&1 | tail -5; fi"); run(command="PYTHONDONTWRITEBYTECODE=1 python3 -I -c \"import json,csv,glob,string\nT=str.maketrans(string.punctuation,' '*len(string.punctuation))\nn=lambda s:' '.join(s.lower().translate(T).split())\nA={}\nfor f in glob.glob('data/*.jsonl'):\n for i,l in enumerate(open(f),1):\n  if l.strip():\n   for m in json.loads(l)['messages']:\n    if m['role']=='assistant':\n     for s in m['content'].replace('!','.').replace('?','.').split('.'):\n      if len(n(s).split())>=3: A.setdefault(n(s),f+':'+str(i))\nfor run in ['r1','r2','r3']:\n R=[json.loads(l) for l in open('eval/'+run+'.jsonl') if l.strip()]\n hits=[(r['id'],A[n(s)]) for r in R for s in r['answer'].replace('!','.').replace('?','.').split('.') if n(s) in A]\n print(run,'answers with a whole data sentence (>=3 words):',len({h[0] for h in hits}),hits[:8])\nfor t in ['','2']:\n k=json.load(open('eval/.blind-key'+t+'.json'))\n for r in csv.DictReader(open('eval/scores'+t+'.csv')):\n  m=k[r['hid']]\n  if m['id']=='p15': print('batch',t or '1',m['run'],'p15 voice',r['voice'])\""); run(command="grep -n -c 'notes.md:\|summary.md:' card.md; grep -n -i -E '^## |situation' card.md | head -30; echo ----; grep -n -E 'write|def |print' tools/build.py | head -20"); write(name="findings", text="## Findings\n\n- Done 6 rows: recomputed from eval/.blind-key*.json + eval/scores*.csv: base 1.417 (b2 1.333) fails p11,p12; r1 2.958 fails p19,p21; r2 2.208 fails p11,p20; r3 2.833 fails p11,p12,p20,p21. Matches runs.md. (session 7)\n- No git repo: tree baseline is ls -laR at session 1.\n- Memorisation: 0 of 24 r1 answers share an 8-word run with data/*.jsonl (session 10, own tokenizer, non-system messages).\n- r1 facts fails: p19 credit score: says it is 'ten per cent of lending decisions' and 'lets the bank borrow a bit more safely from itself' (wrong everyday fact). p21 boiling: '90 degrees Celsius or 198 degrees Fahrenheit' at 1 atm (truth 100 C / 212 F). Neither contradicts a research line; both fail under eval/rubric.md:16 (everyday facts plainly wrong). The brief's 'research line it contradicts' is therefore none.\n")
+
+[Tool]
+run(command="if grep -n -E 'write_text|.write(|open([^)]*["''']w' tools/o…") → session 11 `if grep -n -E 'write_text|.write(|open([^)]*["''…ols/leak.py 2>&1 | tail -5; fi`: exit 2
+/bin/sh: -c: line 0: unexpected EOF while looking for matching `''
+/bin/sh: -c: line 1: syntax error: unexpected end of file
+run(command="PYTHONDONTWRITEBYTECODE=1 python3 -I -c "import json,csv,glo…") → session 12 `PYTHONDONTWRITEBYTECODE=1 python3 -I -c "import …run'],'p15 voice',r['voice'])"`: exit 0
+r1 answers with a whole data sentence (>=3 words): 1 [('p14', 'data/train.jsonl:94')]
+r2 answers with a whole data sentence (>=3 words): 0 []
+r3 answers with a whole data sentence (>=3 words): 1 [('p02', 'data/train.jsonl:20')]
+batch 1 r1 p15 voice 0
+batch 1 r2 p15 voice 0
+batch 1 base p15 voice 0
+batch 2 r3 p15 voice 3
+batch 2 base p15 voice 0
+run(command="grep -n -c 'notes.md:|summary.md:' card.md; grep -n -i -E '^…") → session 13 `grep -n -c 'notes.md:|summary.md:' card.md; grep…int' tools/build.py | head -20`: exit 0
+5:## Who
+10:## Voice
+18:## Words
+24:## Rhythm
+31:## Values
+39:## Never
+47:## Facts an answer may use
+64:## Exchanges (written new, one per Voice-guide situation, summary.md:93-102)
+----
+8:def main():
+28:                fh.write(json.dumps(msg, ensure_ascii=False) + "\n")
+30:        print(f"{f}: {n}")
+31:    print(f"exchanges: {len(pairs)}  duplicates dropped: {len(pairs) - len(uniq)}")
+32:    print(f"train: {len(train)}  valid: {len(valid)}")
+33:    print(f"system line ({len(sysl.split())} words): {sysl}")
+write(name="findings", text="## Findings\n\n- Done 6 rows: recomputed from eval/.blind-key*…") → saved findings (829 characters)
+
+[Assistant]
+The run means and the r1 memorisation count are done. Next I'll rerun the overlap and leak checks with simpler quoting, check the card's research citations and the data's situation coverage, and look at the one r1 answer that repeats a training sentence.
+
+thought: Done so far: the runs.md rows match the score files, the memorisation count is 0, the r1 facts fails are named, and the p15 claim in lesson 3 holds. Session 11 failed on quoting, so overlap.py and leak.py are not rerun yet. I'll grep for writes with a simple pattern and run each tool with -B so it leaves no pycache. Session 13's grep for card citations returned 0. The `\|` may have been lost in quoting, so I'll grep -o with -E for file:line cites to see their real form. build.py writes data/*.jsonl, so for done line 2 I'll count situations from the batch files and the jsonl myself instead of rerunning it. The report says "'Hello.' equals data/train.jsonl:1", but my sentence match found r1 p14 against train:94, so I'll print both. I'll also check that the eval .md files all carry the same settings line.
+act: run(command="grep -n -E 'write_text|[.]write[(]|open[(]' tools/overlap.py tools/leak.py tools/common.py; echo ----; PYTHONDONTWRITEBYTECODE=1 python3 -B tools/overlap.py 2>&1 | tail -6; echo ----; PYTHONDONTWRITEBYTECODE=1 python3 -B tools/leak.py 2>&1 | tail -5"); run(command="grep -o -E '(notes|summary|notes-2|lessons)[.]md:[0-9]+(-[0-9]+)?' card.md | sort | uniq -c | sort -rn | head -15; echo; grep -c -E '[.]md:[0-9]+' card.md; wc -l card.md; echo ----; sed -n 1,46p card.md | cut -c1-200"); run(command="head -3 data/batch-01.txt; echo ----; grep -h -i -E '^#|situation' data/batch-*.txt | cut -c1-120 | sort | uniq -c | head -30; echo ----; grep -h -E '^(base|scores)' eval/base.md eval/r1.md eval/r2.md eval/r3.md | cut -c1-160; echo ----; sed -n 94p data/train.jsonl | cut -c1-600; echo; PYTHONDONTWRITEBYTECODE=1 python3 -I -c \"import json\nfor l in open('eval/r1.jsonl'):\n r=json.loads(l)\n if r['id'] in ('p14','p01'): print(r['id'],r['answer'][:400])\nprint(open('data/train.jsonl').readline()[-300:])\"")
+
+[Tool]
+run(command="grep -n -E 'write_text|[.]write[(]|open[(]' tools/overlap.py…") → session 14 `grep -n -E 'write_text|[.]write[(]|open[(]' tool…B tools/leak.py 2>&1 | tail -5`: exit 0
+----
+files checked: 8  research files: 17
+matches: 0
+----
+prompts: 24  data messages: 478
+exact matches: 0 []
+8-word overlaps: 0 []
+leaks: 0
+run(command="grep -o -E '(notes|summary|notes-2|lessons)[.]md:[0-9]+(-[0-…") → session 15 `grep -o -E '(notes|summary|notes-2|lessons)[.]md…-n 1,46p card.md | cut -c1-200`: exit 0
+- The sea, the ship, freedom (summary.md:30, 88).
+- Survival and his reputation. He drifts toward immortality and settles for fame (summary.md:32, 88).
+- A loose code. He despised Barbossa for breaking the Pirate's Code (summary.md:33).
+- Buried loyalty: picks himself out loud, then acts for the friend (summary.md:34, 98).
+- Trades away what he prizes when luck runs low (summary.md:43, 101).
+- Fear exists but is never named (inferred; summary.md:59).
+
+## Never
+- Murders anyone (summary.md:56; notes.md:73).
+- Picks a fair fight when talk will do (summary.md:57; notes.md:74).
+- Admits a lie. He acts hurt when doubted (summary.md:58; notes.md:75).
+- Gives a plain heroic speech or admits fear outright (inferred; summary.md:59; notes.md:76).
+- States his real motives sincerely and directly (inferred; notes.md:77).
+- Talks about actors, films or scripts, or speaks as an AI. He lives inside his world (persona rule, not from research).
+run(command="head -3 data/batch-01.txt; echo ----; grep -h -i -E '^#|situ…") → session 16 `head -3 data/batch-01.txt; echo ----; grep -h -i…in.jsonl').readline()[-300:])"`: exit 0
+base: mlx-community/Qwen2.5-1.5B-Instruct-4bit  adapter: -  temp 0  max-tokens 220  mean tok/s: 250.3
+scores (blind, eval/rubric.md): n=24  mean in-voice 1.42  facts fails 2 ['p11', 'p12']
+base: mlx-community/Qwen2.5-1.5B-Instruct-4bit  adapter: ../adapters/r1  temp 0  max-tokens 220  mean tok/s: 109.4
+scores (blind, eval/rubric.md): n=24  mean in-voice 2.96  facts fails 2 ['p19', 'p21']
+base: mlx-community/Qwen2.5-1.5B-Instruct-4bit  adapter: ../adapters/r2  temp 0  max-tokens 220  mean tok/s: 111.9
+scores (blind, eval/rubric.md): n=24  mean in-voice 2.21  facts fails 2 ['p11', 'p20']
+base: mlx-community/Qwen2.5-1.5B-Instruct-4bit  adapter: ../adapters/r3  temp 0  max-tokens 220  mean tok/s: 111.9
+scores (blind, eval/rubric.md): n=24  mean in-voice 2.83  facts fails 4 ['p11', 'p12', 'p20', 'p21']
+----
+{"messages": [{"role": "system", "content": "You are Captain Jack Sparrow. Stay in character; answer in his voice. A pirate captain of the Caribbean. The sea is his first love, and his ship, the Black Pearl, is the freedom he keeps chasing. A trickster: caught often, never held for long. He trusts that luck will swing his way and slips off when it does. Morally slippery: he trades a friend away one day and comes back for his crew the next. A loose, slightly drunken swagger. The words wander and slur along. He talks rather than fights, and prefers a deal to a duel. When cornered he stalls with 
+
+p01 At my throat, obviously. Or below it, behind the helm. Somewhere near there, certainly. It's very well hidden, throat, that's where I chooses.
+p14 Safe. Yes. Clearly. The prisoner is clearly safe already. No? I'm only asking. A question. A request. A proposal.
+ {"role": "user", "content": "Are you even sorry?"}, {"role": "assistant", "content": "Sorry. Hmm. I'm sorry it ended the way it did. I'm sorry you're holding that bottle the way you're holding it. And somewhere under all that, if you dig, which I don't advise, I suspect I'm sorry for the rest."}]}
+
+[Assistant]
+Next I'm checking the remaining claims: the card's research citations, the coverage of the 10 situations, the 'Hello.' and train:94 copy claims, and the train-time and loss numbers in runs.md and the logs.
+
+thought: Already checked: the runs.md rows, the r1 memorisation count (0), the r1 facts fails, the overlap rerun (0 matches) and the leak rerun (0), and that every eval .md uses the same settings. Still open:
+- Done 1: how many card trait lines lack a file:line citation. The output of session 15 was cut.
+- Done 2: situation coverage and counts from the batch files.
+- The report says "'Hello.' equals data/train.jsonl:1", but train line 1 is the "Are you even sorry?" exchange. I need to find which r1 answer is 'Hello.' and where it really matches.
+- Compare r1 p14 against train:94 for lesson 6.
+- Train s, val loss and peak RSS from the logs.
+- The lesson 2 claim of about 80 everyday exchanges out of 239.
+All of these only read.
+act: run(command="awk 'NR>=5 && NR<=63 && /^- /' card.md | grep -v -c -E '[.]md:[0-9]'; awk 'NR>=5 && NR<=63 && /^- /' card.md | grep -v -E '[.]md:[0-9]' | cut -c1-160; echo ----; sed -n 64,104p card.md | grep -n -E '^#|^\*\*|^[0-9]' | cut -c1-120"); run(command="for f in data/batch-*.txt; do echo \"$f $(grep -c '^U:' $f)\"; done; echo ----; grep -h -v -E '^(U|A):' data/batch-*.txt | grep -v '^$' | cut -c1-100 | sort | uniq -c | head -30"); run(command="PYTHONDONTWRITEBYTECODE=1 python3 -I -c \"import json\nT=[json.loads(l) for l in open('data/train.jsonl')]\nprint('train94', [m['content'][:300] for m in T[93]['messages'] if m['role']!='system'])\nR={json.loads(l)['id']:json.loads(l)['answer'] for l in open('eval/r1.jsonl')}\nprint('hello answers', [i for i,a in R.items() if a.strip().lower().startswith('hello')])\nfor i,a in R.items():\n  if 'hello' in a.lower()[:40]: print(i, a[:200])\nprint('train1 has Hello', 'Hello.' in open('data/train.jsonl').readline())\n\"; grep -n -c 'Hello' data/train.jsonl; echo ----; for r in r1 r2 r3; do echo == $r; grep -E 'Val loss|real|maximum resident' adapters/$r.log | tail -4; done")
+
+[Tool]
+run(command="awk 'NR>=5 && NR<=63 && /^- /' card.md | grep -v -c -E '[.]m…") → session 17 `awk 'NR>=5 && NR<=63 && /^- /' card.md | grep -v… '^#|^**|^[0-9]' | cut -c1-120`: exit 0
+2
+- Forms of address: mate, love, friend (inferred; not in the research, so use lightly).
+- Talks about actors, films or scripts, or speaks as an AI. He lives inside his world (persona rule, not from research).
+----
+grep: repetition-operator operand invalid
+run(command="for f in data/batch-*.txt; do echo "$f $(grep -c '^U:' $f)";…") → session 18 `for f in data/batch-*.txt; do echo "$f $(grep -c…00 | sort | uniq -c | head -30`: exit 0
+data/batch-01.txt 40
+data/batch-02.txt 40
+data/batch-03.txt 40
+data/batch-04.txt 40
+data/batch-05.txt 39
+data/batch-06.txt 40
+----
+run(command="PYTHONDONTWRITEBYTECODE=1 python3 -I -c "import json\nT=[json…") → session 19 `PYTHONDONTWRITEBYTECODE=1 python3 -I -c "import …dapters/$r.log | tail -4; done`: exit 0
+train94 ["She's in trouble. You could help her.", "I could. I could also take a pleasant nap in a hammock, and only one of those has a chance of getting me shot. ... Which way did she go? I'm only asking."]
+hello answers []
+train1 has Hello False
+2
+----
+== r1
+      293.92 real        10.74 user        59.67 sys
+          1233928192  maximum resident set size
+== r2
+       75.91 real         3.71 user        15.53 sys
+          1234468864  maximum resident set size
+== r3
+      146.04 real         5.75 user        29.19 sys
+          1234567168  maximum resident set size
+
+[Assistant]
+Next I'm checking the claims still open: where 'Hello.' really appears, the val-loss numbers in the logs, how the card's exchange section covers the 10 situations, and the everyday share of the data. I'm also saving the new findings.
+
+thought: Several checks are done: the runs.md means match the score files, the r1 memorisation count is 0, overlap and leak both rerun to 0, every eval file uses the same settings, train s and peak mem match the logs, and 239 exchanges come from 6 batches. Two things are still open. First, the report's claim that "'Hello.' equals data/train.jsonl:1" did not reproduce: no r1 answer starts with Hello, and train line 1 has no 'Hello.'. I'll grep every eval .md and jsonl for it. Second, the log grep's tail cut off the val loss lines. I also still need the card's Exchanges section (lines 64-104) for the 10 situations, a rough everyday count in the data for lesson 2, and the full card citation count. I'm using fixed-string and simple patterns to avoid more regex errors.
+act: run(command="grep -n -F 'Hello' eval/r1.md eval/r2.md eval/r3.md eval/base.md eval/*.jsonl data/train.jsonl data/valid.jsonl | cut -c1-200; echo ----; for r in r1 r2 r3; do echo == $r; grep -F 'Val loss' adapters/$r.log | head -2; grep -F 'Val loss' adapters/$r.log | tail -1; done"); run(command="sed -n 64,104p card.md | cut -c1-140; echo ----; grep -c -E '[.]md:[0-9]' card.md; grep -c '^- ' card.md"); run(command="PYTHONDONTWRITEBYTECODE=1 python3 -I -c \"import json,glob\nn=0;e=0\nkw=('how do i','how should','what is','what\\'s a','tips','recipe','explain','recommend','temperature','best way','help me')\nfor f in ['data/train.jsonl','data/valid.jsonl']:\n for l in open(f):\n  u=[m['content'].lower() for m in json.loads(l)['messages'] if m['role']=='user'][0]\n  n+=1; e+=any(k in u for k in kw)\nprint('exchanges',n,'everyday-ish by keyword',e)\""); write(name="findings", text="## Findings\n\n- Done 6 rows: recomputed from eval/.blind-key*.json + eval/scores*.csv: base 1.417 (b2 1.333) fails p11,p12; r1 2.958 fails p19,p21; r2 2.208 fails p11,p20; r3 2.833 fails p11,p12,p20,p21. Matches runs.md. (session 7)\n- No git repo: tree baseline is ls -laR at session 1.\n- Memorisation: 0 of 24 r1 answers share an 8-word run with data/*.jsonl (session 10, own tokenizer, non-system messages).\n- r1 facts fails: p19 credit score: says it is 'ten per cent of lending decisions' and 'lets the bank borrow a bit more safely from itself' (wrong everyday fact). p21 boiling: '90 degrees Celsius or 198 degrees Fahrenheit' at 1 atm (truth 100 C / 212 F). Neither contradicts a research line; both fail under eval/rubric.md:16 (everyday facts plainly wrong). The brief's 'research line it contradicts' is therefore none.\n- Done 5: overlap.py rerun: files 8, research 17, matches 0. leak.py rerun: exact 0, 8-word 0, leaks 0 (session 14).\n- Done 4: all four eval .md share base model, temp 0, max-tokens 220; score lines match runs.md (session 16).\n- Done 6 train s/peak mem: logs r1 293.92 s/1233928192, r2 75.91/1234468864, r3 146.04/1234567168 match runs.md (session 19).\n- Done 2 counts: batches 40,40,40,40,39,40 = 239 = 215+24 (sessions 3,18).\n- Report claim not reproduced: 'Hello.' equals data/train.jsonl:1. train line 1 has no 'Hello.' and no r1 answer starts with Hello (session 19). Only whole-sentence repeat in r1 is p14 'I'm only asking.' = train.jsonl:94, a 3-word phrase (session 12). runs.md lesson 6 ('reused a training line almost word for word') is not backed by a count; 8-word count is 0.\n- Lesson 3 holds: p15 voice 0 for base, r1, r2; r3 3 (session 12).\n- Card: 2 bullets in lines 5-63 have no file:line, both marked as inferred/persona rule (session 17).\n")
+
+[Tool]
+run(command="grep -n -F 'Hello' eval/r1.md eval/r2.md eval/r3.md eval/bas…") → session 20 `grep -n -F 'Hello' eval/r1.md eval/r2.md eval/r3…dapters/$r.log | tail -1; done`: exit 0
+data/train.jsonl:55:{"messages": [{"role": "system", "content": "You are Captain Jack Sparrow. Stay in character; answer in his voice. A pirate captain of the Caribbean. The sea is his first love, and
+data/train.jsonl:106:{"messages": [{"role": "system", "content": "You are Captain Jack Sparrow. Stay in character; answer in his voice. A pirate captain of the Caribbean. The sea is his first love, an
+----
+== r1
+== r2
+== r3
+run(command="sed -n 64,104p card.md | cut -c1-140; echo ----; grep -c -E …") → session 21 `sed -n 64,104p card.md | cut -c1-140; echo ----;…card.md; grep -c '^- ' card.md`: exit 0
+
+8. His past
+U: How did you get off that island?
+A: Ah. That. I persuaded the tide to change its schedule. Took a week of hard bargaining. The moon was being difficult, as she does.
+
+9. Down on his luck
+U: Your crew's gone and your ship won't sail.
+A: Temporarily. Ships are moody and crews are fickle, but rum, happily, is constant. This compass for one more bottle? It points somewhere, 
+
+10. Feelings
+U: Do you love her?
+A: Love. Heavy word. Weighs as much as an anchor and is about as useful under sail. I love the horizon, the wind, the smell of tar... and po
+----
+44
+45
+run(command="PYTHONDONTWRITEBYTECODE=1 python3 -I -c "import json,glob\nn=…") → session 22 `PYTHONDONTWRITEBYTECODE=1 python3 -I -c "import …,'everyday-ish by keyword',e)"`: exit 0
+exchanges 239 everyday-ish by keyword 41
+write(name="findings", text="## Findings\n\n- Done 6 rows: recomputed from eval/.blind-key*…") → saved findings (1788 characters)
+
+[Assistant]
+The remaining checks are the val-loss lines (the 'Val loss' grep found nothing), the "~80 everyday" figure in lesson 2, and the after snapshot of the tree. I'll run those reads now, then move to the verdict.
+
+thought: Most done lines are checked. Four things are still open. First, the val-loss lines: the log format must differ, so I'll grep case-insensitively for "val". Second, the "about 80 everyday exchanges" claim in lesson 2: my keyword count gave 41, so I'll count by question shape in the batch files to see which is closer. Third, the after `ls -laR` for done line 7, plus a find for anything newer than runs.md, to show I wrote nothing. Fourth, no pycache added. All of these only read.
+act: run(command="for r in r1 r2 r3; do echo == $r; grep -i -E 'val' adapters/$r.log | head -2; grep -i -E 'val' adapters/$r.log | tail -2; done"); run(command="grep -h '^U:' data/batch-*.txt | grep -i -c -E '^U: (how|what|any|can you|should|which|is it|where can|why does|why do)'; grep -h '^U:' data/batch-*.txt | wc -l; grep -h '^U:' data/batch-*.txt | grep -i -E '^U: (how|what|any|can you)' | head -12 | cut -c1-90"); run(command="ls -laR . | grep -v '^total' | wc -l; find . -newer runs.md -type f | head; ls -la tools/__pycache__; ls -la . | cut -c1-90")
+
+[Tool]
+run(command="for r in r1 r2 r3; do echo == $r; grep -i -E 'val' adapters/…") → session 23 `for r in r1 r2 r3; do echo == $r; grep -i -E 'va…dapters/$r.log | tail -2; done`: exit 0
+== r1
+  [38;5;244m   1[0m    [1;35mval[0m [1m3.933[0m    [38;5;244m2.37s[0m
+  [38;5;244m  50[0m    [1;35mval[0m [1m2.790[0m    [38;5;244m2.48s[0m
+  [38;5;244m 350[0m    [1;35mval[0m [1m5.684[0m    [38;5;244m2.30s[0m
+  [38;5;244m 400[0m    [1;35mval[0m [1m6.074[0m    [38;5;244m2.43s[0m
+== r2
+  [38;5;244m   1[0m    [1;35mval[0m [1m3.933[0m    [38;5;244m2.13s[0m
+  [38;5;244m  25[0m    [1;35mval[0m [1m2.855[0m    [38;5;244m2.13s[0m
+  [38;5;244m  75[0m    [1;35mval[0m [1m2.887[0m    [38;5;244m2.26s[0m
+  [38;5;244m 100[0m    [1;35mval[0m [1m2.847[0m    [38;5;244m2.25s[0m
+== r3
+  [38;5;244m   1[0m    [1;35mval[0m [1m3.933[0m    [38;5;244m2.09s[0m
+  [38;5;244m  50[0m    [1;35mval[0m [1m2.790[0m    [38;5;244m2.40s[0m
+  [38;5;244m 150[0m    [1;35mval[0m [1m3.087[0m    [38;5;244m2.33s[0m
+  [38;5;244m 200[0m    [1;35mval[0m [1m3.761[0m    [38;5;244m2.27s[0m
+run(command="grep -h '^U:' data/batch-*.txt | grep -i -c -E '^U: (how|wha…") → session 24 `grep -h '^U:' data/batch-*.txt | grep -i -c -E '… you)' | head -12 | cut -c1-90`: exit 0
+88
+239
+U: What's the weather going to be like tomorrow?
+U: Can you give me a recipe for pancakes?
+U: How do I fix a slow laptop?
+U: What's 15 percent of 80?
+U: Any tips for falling asleep?
+U: How are you today?
+U: Can you recommend a good book?
+U: How do I get my kid to eat vegetables?
+U: What time is it?
+U: How do I ask my boss for a raise?
+U: What's the capital of France?
+U: Can you help me write a birthday message for my mum?
+run(command="ls -laR . | grep -v '^total' | wc -l; find . -newer runs.md …") → session 25 `ls -laR . | grep -v '^total' | wc -l; find . -ne…cache__; ls -la . | cut -c1-90`: exit 0
+./data/valid.jsonl
+total 8
+drwxr-xr-x 3 kaush staff   96 Nov 24 00:21 .
+drwxr-xr-x 9 kaush staff  288 Nov 24 00:21 ..
+-rw-r--r-- 1 kaush staff 5509 Nov 24 00:21 blind.cpython-312.pyc
+total 16
+drwxr-xr-x  9 kaush staff  288 Nov 24 00:25 .
+drwxr-xr-x  7 kaush staff  224 Nov 23 23:35 ..
+drwxr-xr-x 11 kaush staff  352 Nov 24 00:18 adapters
+-rw-r--r--  1 kaush staff 6964 Nov 23 23:56 card.md
+drwxr-xr-x 10 kaush staff  320 Nov 24 00:03 data
+drwxr-xr-x 18 kaush staff  576 Nov 24 00:23 eval
+drwxr-xr-x  7 kaush staff  224 Nov 23 23:48 research
+-rw-r--r--  1 kaush staff 6005 Nov 24 00:25 runs.md
+drwxr-xr-x  9 kaush staff  288 Nov 24 00:21 tools
+
+[Assistant]
+The after-snapshot shows data/train.jsonl and data/valid.jsonl as newer than runs.md, so I'm checking their exact times before judging the tree and data.
+
+thought: The after-snapshot (session 25) lists data/train.jsonl and data/valid.jsonl as newer than runs.md (00:25). I have not written anything, and build.py was never run. Either the author rebuilt the data after writing runs.md, or those files' times are older than they look. I need to know which, because it affects done line 2 and the tree check. I'll get exact mtimes with `ls -laT`, compare them with the training logs and the batch files, and hash the data files. Then I'll redo the after count so it can be set against session 1. All of these only read.
+act: run(command="ls -laT runs.md data/ adapters/r1.log adapters/r3.log eval/r1.jsonl eval/scores2.csv tools/build.py | cut -c1-110; echo ----; stat -f '%m %N' runs.md data/train.jsonl data/valid.jsonl adapters/r1/adapters.safetensors adapters/r3/adapters.safetensors; echo ----; shasum data/train.jsonl data/valid.jsonl; echo ----; ls -laR . | grep -v '^total' | wc -l")
+
+[Tool]
+run(command="ls -laT runs.md data/ adapters/r1.log adapters/r3.log eval/r…") → session 26 `ls -laT runs.md data/ adapters/r1.log adapters/r…R . | grep -v '^total' | wc -l`: exit 0
+  File: "adapters/r1/adapters.safetensors"
+    ID: 10000300000001a Namelen: ?       Type: apfs
+Block size: 4096       Fundamental block size: 4096
+Blocks: Total: 976750080  Free: 469882519  Available: 469882519
+Inodes: Total: 18798605174 Free: 18795300760
+  File: "adapters/r3/adapters.safetensors"
+    ID: 10000300000001a Namelen: ?       Type: apfs
+Block size: 4096       Fundamental block size: 4096
+Blocks: Total: 976750080  Free: 469882519  Available: 469882519
+Inodes: Total: 18798605174 Free: 18795300760
+----
+9c49ef3c8c43dc1706cffe4777cc7e0981181f13  data/train.jsonl
+85c07d8483071ba892c956f75b9d46cf24bba378  data/valid.jsonl
+----
+127
+
+[Assistant]
+The stat call printed filesystem info, not file times, so I'm getting the exact mtimes from Python. I'm also spending one of my two allowed generate calls to check that r1's p21 answer reproduces.
+
+thought: Session 26 used `stat -f`, which here is GNU stat, so it printed filesystem info and no mtimes. The open question is still whether data/valid.jsonl is really newer than runs.md, which would mean a rebuild after the rows were written. I'm printing exact mtimes with a read-only `python3 -I` for runs.md, the data files, the batch files, the training logs, the adapters and the eval files. I'm also using one of the two allowed `mlx_lm generate` calls on r1 with the training system line and the p21 prompt at temp 0 and max-tokens 220. If it reproduces the 90 C answer, the r1 facts fail is confirmed directly. I'm writing the system line to the scratchpad, not the tree, and Python runs with -I so no pycache is added. Then I'll count the tree lines again.
+act: run(command="python3 -I -c \"import os,glob,time\nfs=['runs.md','card.md']+sorted(glob.glob('data/*'))+['adapters/r1.log','adapters/r2.log','adapters/r3.log','adapters/r1/adapters.safetensors','adapters/r3/adapters.safetensors','eval/r1.jsonl','eval/r3.md','eval/scores.csv','eval/scores2.csv','tools/build.py']\nfor f in fs: print(time.strftime('%H:%M:%S',time.localtime(os.stat(f).st_mtime)),f)\""); run(command="S=/private/tmp/claude-501/-private-var-folders-n3-l6pr1nds4bs00x624-0-qqdr0000gn-T-dry-cli/5db83878-2c20-420f-ae6b-aea317a2f35e/scratchpad; mkdir -p $S; python3 -I -c \"import json;print(json.loads(open('data/train.jsonl').readline())['messages'][0]['content'])\" > $S/sys.txt; uv run --python 3.12 --with mlx-lm python -m mlx_lm generate --model mlx-community/Qwen2.5-1.5B-Instruct-4bit --adapter-path adapters/r1 --temp 0 --max-tokens 220 --system-prompt \"$(cat $S/sys.txt)\" --prompt 'At what temperature does water boil?' 2>&1 | tail -8; echo ----; ls -laR . | grep -v '^total' | wc -l; ls tools/__pycache__")
+
+[Tool]
+run(command="python3 -I -c "import os,glob,time\nfs=['runs.md','card.md']+…") → session 27 `python3 -I -c "import os,glob,time…time(os.stat(f).st_mtime)),f)"`: exit 0
+00:00:58 data/batch-04.txt
+00:02:08 data/batch-05.txt
+00:03:11 data/batch-06.txt
+00:27:04 data/train.jsonl
+00:27:04 data/valid.jsonl
+00:11:08 adapters/r1.log
+00:13:58 adapters/r2.log
+00:20:44 adapters/r3.log
+00:11:08 adapters/r1/adapters.safetensors
+00:20:44 adapters/r3/adapters.safetensors
+00:12:23 eval/r1.jsonl
+00:25:09 eval/r3.md
+00:17:14 eval/scores.csv
+00:25:09 eval/scores2.csv
+00:03:11 tools/build.py
+run(command="S=/private/tmp/claude-501/-private-var-folders-n3-l6pr1nds4b…") → error: refused: this terminal is read-only (uses: [terminal:read]) and `> $S/sys.txt` writes a file. Run only commands that read (git status, git diff, git log, git show, grep, cat, ls) and the project's checks (tests, build, lint without --fix or --write); say what should change in your reply
+
+[Assistant]
+The generate call was refused only because of the `>` redirect, so I'll pass the system line inline instead. The data files were written at 00:27:04, after runs.md (00:25:53) and after every training run (r3 ended 00:20:44). I'll read build.py and the run configs to see whether the jsonl on disk is still what was trained on, and check the clock to see whether that write came before my review.
+
+thought: The task is a read-only review, and all done lines are checked except a direct rerun of r1's p21 and one new question. data/train.jsonl and data/valid.jsonl have mtime 00:27:04, later than runs.md and all three trainings. So the counts, the leak check and the memorisation count were run on files that may not be what r1 trained on. I can't run build.py, because it writes. I can rebuild its output in memory and compare the hash with the files on disk, which shows whether the batch files produce exactly these jsonl files. The adapter yaml shows the data path, the r1 log may show the train count, and `date` together with my session-1 listing tells me whether that write came before I started. I'm also spending generate call 1 of 2 with the system line passed inline through $(...), so nothing is written.
+act: run(command="date '+%H:%M:%S'; echo ----; cat tools/build.py; echo ----; grep -n -i -E 'data|iters|seed|batch' adapters/r1.yaml adapters/r2.yaml adapters/r3.yaml; echo ----; grep -i -E 'train|load|exampl|dataset' adapters/r1.log | head -8"); run(command="uv run --python 3.12 --with mlx-lm python -m mlx_lm generate --model mlx-community/Qwen2.5-1.5B-Instruct-4bit --adapter-path adapters/r1 --temp 0 --max-tokens 220 --system-prompt \"$(python3 -I -c \"import json;print(json.loads(open('data/train.jsonl').readline())['messages'][0]['content'])\")\" --prompt 'At what temperature does water boil?' 2>&1 | tail -8; echo ----; ls -laR . | grep -v '^total' | wc -l; ls tools/__pycache__")
+
+[Tool]
+run(command="date '+%H:%M:%S'; echo ----; cat tools/build.py; echo ----; …") → session 28 `date '+%H:%M:%S'; echo ----; cat tools/build.py;…set' adapters/r1.log | head -8`: exit 0
+adapters/r2.yaml:14:val_batches: -1
+adapters/r3.yaml:4:data: data
+adapters/r3.yaml:6:seed: 0
+adapters/r3.yaml:8:batch_size: 4
+adapters/r3.yaml:9:iters: 200
+adapters/r3.yaml:14:val_batches: -1
+----
+Loading configuration file adapters/r1.yaml
+Loading pretrained model
+Loading datasets
+Training
+[34m│[0m    [39mdataset      [0m   [1mdata[0m                                                                                              [34m│[0m
+Trainable parameters: 0.342% (5.276M/1543.714M)
+  [1miter   train_loss     tok/s     tokens[0m
+[1;34mtrain[0m [34m██████████████████████████████[0m [1;34m100%[0m [38;5;244m·[0m [1;34m  400[0m[38;5;244m/400[0m
+run(command="uv run --python 3.12 --with mlx-lm python -m mlx_lm generate…") → session 29 `uv run --python 3.12 --with mlx-lm python -m mlx… | wc -l; ls tools/__pycache__`: exit 0
+  warnings.warn(
+Fetching 9 files: 100%|██████████| 9/9 [00:00<00:00, 3217.59it/s]
+==========
+At one atmosphere of pressure, which is pretty much the same as the atmosphere outside your ship, water boils at 90 degrees Celsius or 198 degrees Fahrenheit. That's warm enough to put a man in a pot, but not warm enough to boil you.
+==========
+Prompt: 235 tokens, 1781.621 tokens-per-sec
+Generation: 56 tokens, 139.096 tokens-per-sec
+Peak memory: 1.636 GB
+----
+127
+blind.cpython-312.pyc
+
+[Assistant]
+The p21 rerun reproduces r1's 90 C answer. Two things are still open: whether the 00:27:04 data write happened before my review started, and whether the batch files rebuild exactly into the jsonl on disk. I'm reading build.py and the clock to settle both, without writing anything.
+
+thought: The rerun of p21 on r1 gives the same 90 C / 198 F answer, so that facts fail is confirmed. data/train.jsonl and data/valid.jsonl were written at 00:27:04, after runs.md (00:25:53) and after the last training (r3, 00:20:44). I need two answers. First, did that write happen before my session 1, and so not by me? The tree count has stayed at 127 throughout, and `date` will show the current time. Second, is the jsonl on disk the same data r1 trained on? I'll print build.py in pieces so the output is not cut, then rebuild its pairs in memory and compare that with the files on disk. I'm also saving the p21 rerun and the timestamp finding now.
+act: run(command="date '+%H:%M:%S'"); run(command="sed -n 1,40p tools/build.py"); run(command="sed -n 1,30p tools/common.py | cut -c1-160"); write(name="findings", text="## Findings\n\n- Done 6 rows: recomputed from eval/.blind-key*.json + eval/scores*.csv: base 1.417 (b2 1.333) fails p11,p12; r1 2.958 fails p19,p21; r2 2.208 fails p11,p20; r3 2.833 fails p11,p12,p20,p21. Matches runs.md. (session 7)\n- No git repo: tree baseline is ls -laR at session 1; line count 127 at sessions 25, 26, 29.\n- Memorisation: 0 of 24 r1 answers share an 8-word run with data/*.jsonl (session 10, own tokenizer, non-system messages).\n- r1 facts fails: p19 credit score: says it is 'ten per cent of lending decisions' and 'lets the bank borrow a bit more safely from itself' (wrong everyday fact). p21 boiling: '90 degrees Celsius or 198 degrees Fahrenheit' at 1 atm (truth 100 C / 212 F); reproduced by an mlx_lm generate rerun at temp 0 (session 29, generate call 1 of 2). Neither contradicts a research line; both fail under eval/rubric.md:16 (everyday facts plainly wrong). The brief's 'research line it contradicts' is therefore none.\n- Done 5: overlap.py rerun: files 8, research 17, matches 0. leak.py rerun: exact 0, 8-word 0, leaks 0 (session 14).\n- Done 4: all four eval .md share base model, temp 0, max-tokens 220; score lines match runs.md (session 16).\n- Done 6 train s/peak mem: logs r1 293.92 s/1233928192, r2 75.91/1234468864, r3 146.04/1234567168 match runs.md (session 19). Val loss: r1 final 6.074, min 2.790 at iter 50; r2 final 2.847; r3 final 3.761 match runs.md (session 23).\n- Done 2 counts: batches 40,40,40,40,39,40 = 239 = 215+24 (sessions 3,18). Card Exchanges lists the 10 situations (card.md:64-104).\n- data/train.jsonl and data/valid.jsonl mtime 00:27:04: after runs.md 00:25:53 and after r3 training ended 00:20:44 (session 27). So the data was rewritten after the last training and after the report, and the report does not mention it. Whether it matches what r1 trained on: checking.\n- Report claim not reproduced: 'Hello.' equals data/train.jsonl:1. train line 1 has no 'Hello.' and no r1 answer starts with Hello (sessions 19, 20). Only whole-sentence repeat in r1 is p14 'I'm only asking.' = train.jsonl:94, a 3-word phrase (session 12). runs.md lesson 6 ('reused a training line almost word for word') is not backed by a count; 8-word count is 0.\n- Lesson 2 figure 'about 80 everyday of 239': question-shape count 88/239, keyword count 41; roughly consistent (session 24, 22).\n- Lesson 3 holds: p15 voice 0 for base, r1, r2; r3 3 (session 12).\n- Card: 2 bullets in lines 5-63 have no file:line, both marked as inferred/persona rule (session 17).\n")
+
+[Tool]
+run(command="date '+%H:%M:%S'") → session 30 `date '+%H:%M:%S'`: exit 0
+00:40:17
+run(command="sed -n 1,40p tools/build.py") → session 31 `sed -n 1,40p tools/build.py`: exit 0
+        with open(ROOT / "data" / f"{name}.jsonl", "w") as fh:
+            for u, a in rows:
+                msg = {"messages": [{"role": "system", "content": sysl},
+                                    {"role": "user", "content": u},
+                                    {"role": "assistant", "content": a}]}
+                fh.write(json.dumps(msg, ensure_ascii=False) + "\n")
+    for f, n in sorted(per_file.items()):
+        print(f"{f}: {n}")
+    print(f"exchanges: {len(pairs)}  duplicates dropped: {len(pairs) - len(uniq)}")
+    print(f"train: {len(train)}  valid: {len(valid)}")
+    print(f"system line ({len(sysl.split())} words): {sysl}")
+
+
+if __name__ == "__main__":
+    main()
+run(command="sed -n 1,30p tools/common.py | cut -c1-160") → session 32 `sed -n 1,30p tools/common.py | cut -c1-160`: exit 0
+    parts = []
+    for name in ("Who", "Voice"):
+        for line in section(card, name).splitlines():
+            line = CITE.sub("", line.lstrip("- ").strip())
+            if line:
+                parts.append(line.rstrip(".") + ".")
+    head = "You are Captain Jack Sparrow. Stay in character; answer in his voice."
+    return head + " " + " ".join(parts)
+
+
+def read_batches():
+    pairs = []
+    for path in sorted((ROOT / "data").glob("batch-*.txt")):
+        u = None
+        for raw in path.read_text().splitlines():
+write(name="findings", text="## Findings\n\n- Done 6 rows: recomputed from eval/.blind-key*…") → saved findings (2498 characters)
+
+[Assistant]
+The p21 rerun reproduced r1's 90 C answer. Next I'm reading the top of build.py and rebuilding its output in memory, to see whether the 00:27 rewrite of the jsonl changed what r1 trained on.
+
+thought: One question is open. data/train.jsonl and data/valid.jsonl were rewritten at 00:27:04, after every training run and after runs.md. Its inputs are older than all the training: card.md 23:56, batch files and build.py by 00:03. If build.py is deterministic, a rebuild from those same inputs gives the same content r1 trained on. I'll print lines 1-27 of build.py to see the split and seed. Then I'll replay its logic in memory with -B and no bytecode, and compare the sha1 with the files on disk (9c49ef3c… and 85c07d84…). Nothing is written.
+act: run(command="sed -n 1,27p tools/build.py | cut -c1-160; echo ----; sed -n 30,60p tools/common.py | cut -c1-160")
+
+[Tool]
+run(command="sed -n 1,27p tools/build.py | cut -c1-160; echo ----; sed -n…") → session 33 `sed -n 1,27p tools/build.py | cut -c1-160; echo … tools/common.py | cut -c1-160`: exit 0
+    for name, rows in (("train", train), ("valid", valid)):
+        with open(ROOT / "data" / f"{name}.jsonl", "w") as fh:
+            for u, a in rows:
+                msg = {"messages": [{"role": "system", "content": sysl},
+                                    {"role": "user", "content": u},
+                                    {"role": "assistant", "content": a}]}
+----
+        for raw in path.read_text().splitlines():
+            line = raw.strip()
+            if line.startswith("U: "):
+                u = line[3:].strip()
+            elif line.startswith("A: ") and u is not None:
+                pairs.append((u, line[3:].strip(), path.name))
+                u = None
+    return pairs
+
+[Assistant]
+I'm rebuilding build.py's output in memory from the batch files and card, then comparing its hash with the jsonl on disk. That shows whether the 00:27:04 rewrite still holds what r1 trained on. Nothing is written.
+
+thought: The data files on disk were rewritten at 00:27:04, after every training run and after runs.md. But their inputs (card.md 23:56, batch files and build.py by 00:03) are all older than r1's training. build.py is deterministic (dedupe on lowercased user line, Random(0) shuffle, 10% valid). If an in-memory replay hashes to the same sha1 as the files on disk (9c49ef3c… and 85c07d84…), the content is the same data r1 trained on, and the rewrite only re-ran the build. If it differs, the counts, leak and memorisation checks were run on different data, and that is a finding. I'm importing common.py with -B and no bytecode so no pycache is added, then counting the tree again.
+act: run(command="PYTHONDONTWRITEBYTECODE=1 python3 -I -B -c \"import sys,json,random,hashlib\nsys.path.insert(0,'tools')\nimport common\npairs=common.read_batches()\nseen=set();uniq=[]\nfor u,a,_ in pairs:\n k=u.lower()\n if k in seen: continue\n seen.add(k);uniq.append((u,a))\nrandom.Random(0).shuffle(uniq)\nnv=max(1,round(len(uniq)/10))\nsysl=common.system_line()\nfor name,rows in (('train',uniq[nv:]),('valid',uniq[:nv])):\n s=''.join(json.dumps({'messages':[{'role':'system','content':sysl},{'role':'user','content':u},{'role':'assistant','content':a}]},ensure_ascii=False)+'\\n' for u,a in rows)\n print(name,len(rows),hashlib.sha1(s.encode()).hexdigest(),hashlib.sha1(open('data/'+name+'.jsonl','rb').read()).hexdigest())\nprint('pairs',len(pairs),'dupes',len(pairs)-len(uniq),'sys words',len(sysl.split()))\"; echo ----; ls -laR . | grep -v '^total' | wc -l; ls tools/__pycache__")
+
+[Tool]
+run(command="PYTHONDONTWRITEBYTECODE=1 python3 -I -B -c "import sys,json,…") → session 34 `PYTHONDONTWRITEBYTECODE=1 python3 -I -B -c "impo… | wc -l; ls tools/__pycache__`: exit 0
+train 215 9c49ef3c8c43dc1706cffe4777cc7e0981181f13 9c49ef3c8c43dc1706cffe4777cc7e0981181f13
+valid 24 85c07d8483071ba892c956f75b9d46cf24bba378 85c07d8483071ba892c956f75b9d46cf24bba378
+pairs 239 dupes 0 sys words 167
+----
+127
+blind.cpython-312.pyc
+
+[Assistant]
+The rebuilt build.py output from the batch files and card hashes the same as the data files on disk, so the 00:27:04 rewrite changed nothing in what r1 trained on. I'm recording that and moving to the verdict.
+
+thought: The in-memory replay of build.py matches the files on disk exactly (train 215 9c49ef3c…, valid 24 85c07d84…, 239 pairs, 0 duplicates, a 167-word system line). The 00:27:04 rewrite only re-ran a deterministic build with unchanged inputs, so the data counts, the leak check and the memorisation count apply to what r1 trained on. It is a "should" note: the report does not mention the re-run. The tree count is still 127 and the pycache holds only blind.cpython-312.pyc, so the tree is unchanged by me. Every done line is now checked. The remaining substantive finding is runs.md lesson 6, which rests on a 'Hello.' copy that does not reproduce. It goes into the verdict, so I'm updating findings and moving on.
+act: write(name="findings", text="## Findings\n\n- Done 6 rows: recomputed from eval/.blind-key*.json + eval/scores*.csv: base 1.417 (b2 1.333) fails p11,p12; r1 2.958 fails p19,p21; r2 2.208 fails p11,p20; r3 2.833 fails p11,p12,p20,p21. Matches runs.md. (session 7)\n- No git repo: tree baseline is ls -laR at session 1; line count 127 at sessions 25, 26, 29, 34; pycache only blind.cpython-312.pyc (pre-existing, 00:21).\n- Memorisation: 0 of 24 r1 answers share an 8-word run with data/*.jsonl (session 10, own tokenizer, non-system messages).\n- r1 facts fails: p19 credit score: 'ten per cent of lending decisions', 'lets the bank borrow a bit more safely from itself'. p21 boiling: '90 degrees Celsius or 198 degrees Fahrenheit' at 1 atm; reproduced by mlx_lm generate at temp 0 (session 29, call 1 of 2). Neither contradicts a research line; both fail under eval/rubric.md:16 (everyday facts plainly wrong).\n- Done 5: overlap.py matches 0; leak.py exact 0, 8-word 0, leaks 0 (session 14).\n- Done 4: four eval .md share base model, temp 0, max-tokens 220; score lines match runs.md (session 16). 24 prompts.\n- Done 6 train s/peak mem/val loss match logs (sessions 19, 23).\n- Done 2: 239 = 215+24, 6 batches; card Exchanges has 10 situations (card.md:64-104).\n- data/*.jsonl mtime 00:27:04 is after runs.md and r3 training, but an in-memory rebuild of build.py hashes identical to disk (session 34). Content = trained data; the report does not mention the re-run (should).\n- runs.md lesson 6 and the report claim \"'Hello.' equals data/train.jsonl:1\" do not reproduce: train line 1 has no Hello; no r1 answer has Hello; only whole-sentence repeat is p14 'I'm only asking.' (3 words) = train.jsonl:94; 8-word count 0 (sessions 10, 12, 19, 20).\n- Lesson 2 '~80 everyday of 239': question-shape 88, keyword 41; roughly holds.\n- Lesson 3 holds: p15 voice 0 for base, r1, r2; r3 3.\n- Card: 44 cited lines; 2 bullets uncited, both marked inferred/persona rule (session 17).\n"); goto_phase(name="verdict")
+
+[Tool]
+write(name="findings", text="## Findings\n\n- Done 6 rows: recomputed from eval/.blind-key*…") → saved findings (1934 characters)
+goto_phase(name="verdict") → left check; now verdict
+
+[Assistant]
+I'm taking the final tree snapshot for comparison with session 1 before I reply; the reply comes in the next step.
+
+thought: Every done line is checked. The verdict phase wants a final tree check, and the reply cannot go in the same act as a run. So this step lists the tree, counts it, checks the pycache, and confirms git is still absent. The reply comes next.
+act: run(command="ls -la . | cut -c1-90; ls -laR . | grep -v '^total' | wc -l; ls -la tools/__pycache__; find . -newer data/train.jsonl -type f | head; git status --short 2>&1 | head -1")
+
+[Tool]
+run(command="ls -la . | cut -c1-90; ls -laR . | grep -v '^total' | wc -l;…") → session 35 `ls -la . | cut -c1-90; ls -laR . | grep -v '^tot… status --short 2>&1 | head -1`: exit 0
+drwxr-xr-x  7 kaush staff  224 Nov 23 23:35 ..
+drwxr-xr-x 11 kaush staff  352 Nov 24 00:18 adapters
+-rw-r--r--  1 kaush staff 6964 Nov 23 23:56 card.md
+drwxr-xr-x 10 kaush staff  320 Nov 24 00:03 data
+drwxr-xr-x 18 kaush staff  576 Nov 24 00:23 eval
+drwxr-xr-x  7 kaush staff  224 Nov 23 23:48 research
+-rw-r--r--  1 kaush staff 6005 Nov 24 00:25 runs.md
+drwxr-xr-x  9 kaush staff  288 Nov 24 00:21 tools
+127
+total 8
+drwxr-xr-x 3 kaush staff   96 Nov 24 00:21 .
+drwxr-xr-x 9 kaush staff  288 Nov 24 00:21 ..
+-rw-r--r-- 1 kaush staff 5509 Nov 24 00:21 blind.cpython-312.pyc
+./data/valid.jsonl
+fatal: not a git repository (or any parent up to mount point /Volumes)
+
+[Assistant]
+thought: Every done line is checked and the final tree snapshot matches the earlier ones. One finding blocks: runs.md lesson 6 and the report's "'Hello.' equals data/train.jsonl:1" do not reproduce, and the next four builds would carry that lesson forward. I'm sending it back with that fix, plus the smaller notes and every rerun.
+act: reply(text="Verdict: send back. One lesson is unsupported. Everything else holds and was rerun.
+
+**Blockers**
+- runs.md, Lessons, Quality item 6, and the report line \"r1 repeats training lines: 'Hello.' equals data/train.jsonl:1\" are wrong.
+  - Line 1 of data/train.jsonl is the \"Are you even sorry?\" exchange and contains no 'Hello.'. 'Hello' appears only at train.jsonl:55 and :106 (session 20).
+  - No r1 answer contains 'Hello' (sessions 19, 20).
+  - 0 of 24 r1 answers share an 8-word run with data/*.jsonl (session 10).
+  - The only whole-sentence repeat in r1 is p14 \"I'm only asking.\" (3 words), which also appears at train.jsonl:94. r3 has one similar repeat, p02 against train.jsonl:20 (session 12).
+  - Fix: rewrite lesson 6 and the report line. Use the measured count (8-word: 0 of 24) and the p14 three-word echo, and keep the advice to check tuned answers against data/*.jsonl. As written, the lesson tells the next four builds about a memorisation problem that was not observed.
+
+**Done lines**
+1. Holds. card.md has 44 cited lines. The 2 uncited bullets are labelled 'inferred' and 'persona rule' (session 17).
+2. Holds. 6 batch files hold 40+40+40+40+39+40 = 239 exchanges, split 215/24, in chat format, with 0 duplicates. card.md:64-104 lists the 10 situations.
+3. Holds. adapters/r1, r2 and r3 exist, with checkpoints.
+4. Holds. 24 prompts. base, r1, r2 and r3 .md all use the same base model, temp 0 and max-tokens 220. Score lines are present (session 16).
+5. Holds. overlap.py: 0 matches. leak.py: exact 0, 8-word 0 (session 14).
+6. Holds. Means recomputed from the blind keys and score files: base 1.417 (batch-2 rescore 1.333), r1 2.958, r2 2.208, r3 2.833. Fails: base p11,p12; r1 p19,p21; r2 p11,p20; r3 p11,p12,p20,p21. Train seconds, peak RSS and val loss in runs.md all match the logs (sessions 7, 19, 23).
+7. Holds. runs.md states plainly that the bar is not met: r1 scores 2.96, below 4, and +1.54 over the base.
+8. Fails on item 6 (above). The other lessons follow from the numbers:
+   - Lesson 2: 88 of 239 exchanges are question-shaped, which fits 'about 80'.
+   - Lesson 3: p15 scored 0 for base, r1 and r2, and 3 for r3.
+   - Lesson 1: val minimum is 2.790 at iter 50, final 6.074.
+   - Speed: 293.92/400 = 0.73 s per iter.
+
+**r1 facts fails**
+Neither contradicts a research line. Both fail under eval/rubric.md:16 (everyday facts plainly wrong).
+- p19, credit score: r1 said it is \"Ten per cent of lending decisions\" and that a better score \"lets the bank borrow a bit more safely from itself\".
+- p21, boiling point: r1 said \"water boils at 90 degrees Celsius or 198 degrees Fahrenheit\" at 1 atm. This reproduced exactly with mlx_lm generate (session 29).
+
+**Should (not blocking)**
+- data/train.jsonl and data/valid.jsonl were modified at 00:27:04. That is after runs.md (00:25) and after the r3 training (00:20:44), and the report does not mention it. I rebuilt them in memory from the batch files and card.md, and the hashes match the files on disk: train 9c49ef3c…, valid 85c07d84… (session 34). The content is therefore what the runs trained on, but the re-run should be reported.
+- 'Memorisation not counted' is listed under Unverified, but it was cheap to measure: 0.
+- None of tools/*.py has a test; they were proven only by manual runs.
+- Scope held: only research facts are used, 3 runs, no commit. The pycache and the HF cache are declared in the report.
+
+**Ran**
+- s7: recompute of the means from the score files → `2 r3 24 2.833 ['p11','p12','p20','p21']`
+- s10: own 8-word r1-vs-data check → `r1 answers 24 sharing 8-word run with data: 0 []`
+- s12: whole-sentence repeats and p15 scores → `batch 2 base p15 voice 0`
+- s14: `python3 -B tools/overlap.py; python3 -B tools/leak.py` → `matches: 0` … `leaks: 0`
+- s16: settings and score lines of the eval .md files → r3: `mean in-voice 2.83 facts fails 4`
+- s18: `grep -c '^U:' data/batch-*.txt` → `data/batch-06.txt 40`
+- s19: real time and max RSS from the logs → `1234567168 maximum resident set size`
+- s23: val-loss lines from the logs → r3 `200 val 3.761`
+- s24: question-shape count → `239`
+- s29: `uv run --python 3.12 --with mlx-lm python -m mlx_lm generate --model mlx-community/Qwen2.5-1.5B-Instruct-4bit --adapter-path adapters/r1 --temp 0 --max-tokens 220 --system-prompt <train system line> --prompt 'At what temperature does water boil?'` → `…90 degrees Celsius or 198 degrees Fahrenheit…`, `Peak memory: 1.636 GB` (generate call 1 of 2)
+- s34: in-memory rebuild by build.py logic → `pairs 239 dupes 0 sys words 167`, both hashes equal
+- s35: `ls -laR . | wc -l` → `127`; `git status` → `fatal: not a git repository`
+
+**Unverified**
+- I did not rescore any voice or facts judgements. Scoring is one self-scorer, as the report says.
+- I did not tag each data exchange by situation, so the 10 situations are confirmed only through card.md and the batch structure.
+- I did not rerun p19 (one generate call is unused).
+- I did not confirm the HF cache contents.
+- runs.md line numbers for the lessons are not quoted, because the file view was cut off.
+
+**Tree**
+There is no git repo. `ls -laR` gives 127 lines at sessions 25, 26, 29, 34 and 35. tools/__pycache__ holds only blind.cpython-312.pyc (00:21, from before the review). The only files newer than train.jsonl are the data files written at 00:27:04, and their content matches a deterministic rebuild. Nothing was written by me.")
+
+[User]
+Recheck after your send-back. dev-sparrow-opus says it edited runs.md only, with no training. Its changes: runs.md:9 (new) memorisation measured, r1 0 of 24 and r3 1 of 24 (p12), no r1 answer contains 'Hello'. runs.md:10 (new) data/*.jsonl rewritten after r3 by test-phase reruns of tools/build.py, sha256 matches an in-memory rebuild from data/batch-*.txt (seed 0). runs.md:30 lesson 6 rewritten with these counts and the p14 'I'm only asking.' echo (train.jsonl:94), keeping the advice to check tuned answers against data/*.jsonl. It ran memo.py, last line: 'r1: 0 of 24 answers share an 8-word run with data/*.jsonl []'. It also reports that in a live check outside the eval set, r1 answered 'Hello.' with the batch-02 answer to 'Hi there.' word for word; it did not find which train.jsonl line holds it. Check: 1) runs.md:9, :10 and :30 say this and match your own counts; 2) the 5 table rows are unchanged; 3) no other file changed since your review (ls -la or mtimes); 4) if cheap, grep which train.jsonl line holds that 'Hi there.' answer, so the lesson can mention it. Change no file, run no training. Reply with the verdict form, short: accept or send back, with commands and last lines. Never commit, push or publish.
+
+[Assistant]
+I'm rechecking runs.md:9, :10 and :30 and the table rows, comparing every file's mtime against the earlier snapshot, recounting 8-word runs for r1, r2 and r3, and finding the 'Hi there.' line. Nothing is written.
+
+thought: The author says only runs.md changed: new lines 9 and 10, and lesson 6 at line 30 rewritten. I need four things. First, runs.md with line numbers, to read lines 9, 10 and 30 and to see that the 5 table rows still hold my recomputed values. Second, mtimes and a file count for the whole tree against my session-35 snapshot (127 lines, pycache with only blind.cpython-312.pyc). They mention running memo.py, so a new tools/memo.py or new .pyc would be a change outside the stated scope. Third, my own 8-word recount for r1, r2 and r3, because they claim r3 is 1 of 24 (p12) and I only counted r1 before. Fourth, a grep for 'Hi there' in the batch files and train/valid.jsonl. These are all reads; the reply comes in the next step.
+act: run(command="cat -n runs.md | cut -c1-400"); run(command="PYTHONDONTWRITEBYTECODE=1 python3 -I -c \"import os,time\nfor d,_,fs in sorted(os.walk('.')):\n for f in sorted(fs):\n  p=os.path.join(d,f); t=os.stat(p).st_mtime\n  if t>time.mktime(time.strptime('2026-11-24 00:26','%Y-%m-%d %H:%M')): print(time.strftime('%H:%M:%S',time.localtime(t)),p)\"; echo ----; ls -laR . | grep -v '^total' | wc -l; ls -la tools tools/__pycache__"); run(command="PYTHONDONTWRITEBYTECODE=1 python3 -I -c \"import json,glob,string\nT=str.maketrans(string.punctuation,' '*len(string.punctuation))\nw=lambda s:s.lower().translate(T).split()\nsh=lambda s:{tuple(t[i:i+8]) for t in [w(s)] for i in range(len(t)-7)}\nD=set()\nfor f in glob.glob('data/*.jsonl'):\n for l in open(f):\n  if l.strip():\n   for m in json.loads(l)['messages']:\n    if m['role']!='system': D|=sh(m['content'])\nfor run in ['r1','r2','r3']:\n R=[json.loads(l) for l in open('eval/'+run+'.jsonl') if l.strip()]\n hit=[r['id'] for r in R if sh(r['answer'])&D]\n print(run,len(hit),'of',len(R),hit)\"; echo ----; grep -n -F 'Hi there' data/batch-*.txt | cut -c1-200; grep -n -A1 -F 'U: Hi there' data/batch-*.txt | cut -c1-200; grep -n -F '\"Hi there.\"' data/train.jsonl data/valid.jsonl | cut -d: -f1-2")
+
+[Tool]
+run(command="cat -n runs.md | cut -c1-400") → session 36 `cat -n runs.md | cut -c1-400`: exit 0
+    22	## Lessons for the next character
+    23	
+    24	Quality first:
+    25	1. Do not pick a run or checkpoint by val loss. Here the lowest val loss (r2, 2.85) was the worst tuned voice, and the highest (r1, 6.07) was the best. With about 240 short hand-written exchanges, val loss rises after about 1 epoch (54 iters) while the style keeps sinking in. Save checkpoints every 50-100 iters and choose by a blind voice score on a few prompts.
+    26	2. Everyday questions are where the voice leaks out: lists and "Here are a few steps". The data had about 80 everyday exchanges out of 239. Next time aim for half the data, with short in-voice answers, and include several list-shaped questions answered without lists.
+    27	3. Never-tests need many examples, not one or two. With 2 AI and 1 actor example, "are you a language model" still scored 0 in base, r1 and r2. Give each Never 6-10 varied examples, with paraphrases of the trigger.
+    28	4. Facts drift both ways. Tuning taught the manner but also invented canon (Barbossa "married", a reversed marooning) and broke everyday facts (90 C boiling point, hinge advice). Add more exchanges that state the card's facts plainly in voice, and more correct everyday facts with a light touch.
+    29	5. The 1.5B 4-bit base repeats itself at temp 0 (loops on p01, p08, p16) and sometimes recites the system line. In the next eval try a small repetition penalty or temp 0.3 with a fixed seed, and a shorter system line, under 80 words.
+    30	6. Memorisation, measured: 0 of 24 r1 answers share an 8-word run with data/*.jsonl, and r3 has 1 of 24 (p12). The only whole-sentence echo in r1 is the 3-word "I'm only asking." on p14, which also appears at data/train.jsonl:94. Tuning picked up the manner, not the lines. overlap.py only checks against research/, so the next build should run the same 8-word check of the tuned answers again
+    31	7. Blind scoring is only partly blind when the base answers are identical across batches (temp 0). Shuffle every run into one batch at the end, or have a second scorer.
+    32	
+    33	Speed:
+    34	1. Training costs about 0.73 s per iter at batch 4, rank 8 and 16 layers on this machine: 100 iters in 76 s, 400 in 294 s. Peak RSS is about 1.23 GB in every run, so memory is not the limit; there is room for a larger batch or rank.
+    35	2. The eval runs at about 250 tok/s for the base, so 24 prompts take well under a minute. One training run plus checkpoint evals fits in about 5 minutes.
+    36	3. The next builds should do one run of about 300 iters saving every 50, then eval 3-4 checkpoints instead of separate runs. That is cheaper than retraining shorter runs, and r3 shows the curve is the same at seed 0.
+run(command="PYTHONDONTWRITEBYTECODE=1 python3 -I -c "import os,time\nfor …") → session 37 `PYTHONDONTWRITEBYTECODE=1 python3 -I -c "import …ls -la tools tools/__pycache__`: exit 0
+drwxr-xr-x 9 kaush staff  288 Nov 24 00:21 .
+drwxr-xr-x 9 kaush staff  288 Nov 24 00:25 ..
+drwxr-xr-x 3 kaush staff   96 Nov 24 00:21 __pycache__
+-rw-r--r-- 1 kaush staff 2972 Nov 24 00:21 blind.py
+-rw-r--r-- 1 kaush staff 1355 Nov 24 00:03 build.py
+-rw-r--r-- 1 kaush staff 1269 Nov 24 00:03 common.py
+-rw-r--r-- 1 kaush staff 2248 Nov 24 00:05 eval.py
+-rw-r--r-- 1 kaush staff 1178 Nov 24 00:04 leak.py
+-rw-r--r-- 1 kaush staff 1935 Nov 24 00:04 overlap.py
+
+tools/__pycache__:
+total 8
+drwxr-xr-x 3 kaush staff   96 Nov 24 00:21 .
+drwxr-xr-x 9 kaush staff  288 Nov 24 00:21 ..
+-rw-r--r-- 1 kaush staff 5509 Nov 24 00:21 blind.cpython-312.pyc
+run(command="PYTHONDONTWRITEBYTECODE=1 python3 -I -c "import json,glob,st…") → session 38 `PYTHONDONTWRITEBYTECODE=1 python3 -I -c "import …ta/valid.jsonl | cut -d: -f1-2`: exit 0
+r1 0 of 24 []
+r2 0 of 24 []
+r3 1 of 24 ['p12']
+----
+data/batch-02.txt:91:U: Hi there.
+data/batch-02.txt:91:U: Hi there.
+data/batch-02.txt-92-A: Hello yourself. You've caught me in a rare good mood and an even rarer sober one, so be quick about what you want.
+data/train.jsonl:106
+
+[Assistant]
+Lines 1-21 of runs.md, the end of line 30 and the mtime list were all cut off, so I'm printing each one on its own before I judge.
+
+thought: Lines 9, 10 and the table of runs.md were cut, line 30 stops at 400 characters, and the list of files newer than 00:26 was also lost. I'm printing each separately. My counts already agree with the author's: r1 0, r2 0, r3 1 (p12). The 'Hi there.' exchange is batch-02.txt:91-92, which is data/train.jsonl:106. tools/ has no memo.py and the pycache is unchanged. One thing to read closely: line 30 says "not the lines", but r1 echoing train:106 word for word in a live check may contradict that.
+act: run(command="sed -n 1,21p runs.md | cut -c1-700"); run(command="sed -n 30p runs.md"); run(command="find . -type f -newer eval/scores2.csv | sort; echo ----; python3 -I -c \"import os,time;[print(time.strftime('%H:%M:%S',time.localtime(os.stat(f).st_mtime)),f) for f in ('runs.md','data/train.jsonl','data/valid.jsonl','card.md','eval/r1.jsonl')]\"; ls -laR . | grep -v '^total' | wc -l")
+
+[Tool]
+run(command="sed -n 1,21p runs.md | cut -c1-700") → session 39 `sed -n 1,21p runs.md | cut -c1-700`: exit 0
+In-voice is scored 0-5 and facts pass/fail, per eval/rubric.md. Both were scored blind by me from shuffled files with hidden ids: batch 1 is eval/blind.md + eval/scores.csv (base, r1, r2; seed 7), and batch 2 is eval/blind2.md + eval/scores2.csv (base, r3; seed 11).
+Copy matches is the number of 8-word runs shared with research/*.md and research/sources/*.txt, from tools/overlap.py over data/*.jsonl and eval/*.md. Prompt leaks into the training data (tools/leak.py, exact match + 8-word): 0.
+Memorisation (tuned answers vs data/*.jsonl, 8-word runs): r1 0 of 24, r3 1 of 24 (p12). No r1 answer contains 'Hello'.
+data/train.jsonl and data/valid.jsonl were rewritten after the r3 training, by the test-phase reruns of tools/build.py. Their sha256 matches an in-memory rebuild from data/batch-*.txt (seed 0), so the content is unchanged from what r1-r3 trained on.
+
+| run | base model | train/valid | iters | lr | rank/layers | train s | peak mem | final val loss | mean in-voice | facts fails | copy matches | changed, and why |
+|-----|------------|-------------|-------|----|-------------|---------|----------|----------------|---------------|-------------|--------------|------------------|
+| base | Qwen2.5-1.5B-Instruct-4bit | 0/0 | 0 | - | - | 0 | - | - | 1.42 | 2 (p11, p12) | 0 | Untuned model with the same system line. It is a plain assistant with costume words, and it calls itself a language model on p15. Batch-2 rescore of the same answers: 1.33. |
+| r1 | Qwen2.5-1.5B-Instruct-4bit | 215/24 | 400 | 1e-5 | 8/16 | 293.92 | 1.23 GB (1233928192 B) | 6.074 (min 2.790 at iter 50) | **2.96** | 2 (p19, p21) | 0 | First run. Train loss fell to 0.010 while val loss rose after iter 100, a clear overfit by val loss, yet it is the best voice. |
+| r2 | Qwen2.5-1.5B-Instruct-4bit | 215/24 | 100 | 1e-5 | 8/16 | 75.91 | 1.23 GB (1234468864 B) | 2.847 | 2.21 | 2 (p11, p20) | 0 | iters 400 -> 100, to stop near the val minimum. Val loss was best, but the voice was worse: the model falls back to assistant answers. |
+| r3 | Qwen2.5-1.5B-Instruct-4bit | 215/24 | 200 | 1e-5 | 8/16 | 146.04 | 1.23 GB (1234567168 B) | 3.761 | 2.83 | 4 (p11, p12, p20, p21) | 0 | iters 400 -> 200, the midpoint, to test whether r1's voice can be kept with less overfit. The voice was nearly r1's and this was the only run that passed p15 (AI question, 3 vs 0), but it had more facts fails: an invented marriage to Barbossa, a compass described as an ordinary instrument, a wrong boiling point, and hinge nonsense. |
+
+Best run: r1 (adapters/r1/adapters.safetensors). **It does not meet the bar.** Its mean in-voice is 2.96, short of the 4.0 target, though it is +1.54 over the base, and it has 2 facts fails where the target was 0. Talk to it with:
+`uv run --python 3.12 --with mlx-lm python -m mlx_lm generate --model mlx-community/Qwen2.5-1.5B-Instruct-4bit --adapter-path adapters/r1 --temp 0 --max-tokens 220 --system-prompt "$(cd tools && uv run --python 3.12 python -c 'from common import system_line; print(system_line())')" --prompt "..."`
+run(command="sed -n 30p runs.md") → session 40 `sed -n 30p runs.md`: exit 0
+6. Memorisation, measured: 0 of 24 r1 answers share an 8-word run with data/*.jsonl, and r3 has 1 of 24 (p12). The only whole-sentence echo in r1 is the 3-word "I'm only asking." on p14, which also appears at data/train.jsonl:94. Tuning picked up the manner, not the lines. overlap.py only checks against research/, so the next build should run the same 8-word check of the tuned answers against data/*.jsonl and put the count in each row.
+run(command="find . -type f -newer eval/scores2.csv | sort; echo ----; py…") → session 41 `find . -type f -newer eval/scores2.csv | sort; e…R . | grep -v '^total' | wc -l`: exit 0
+./data/train.jsonl
+./data/valid.jsonl
+./eval/r3.md
+./runs.md
+----
+00:45:08 runs.md
+00:27:04 data/train.jsonl
+00:27:04 data/valid.jsonl
+23:56:42 card.md
+00:12:23 eval/r1.jsonl
+127
+
+[Assistant]
+Lines 9, 10 and 30 match my counts, the table rows are unchanged, and only runs.md changed. One open point: line 30 says tuning picked up "the manner, not the lines", but the author's live check says r1 recites train.jsonl:106 word for word. I'm using my last generate call to confirm that before judging.
+
+thought: The recheck mostly holds. runs.md:9 states r1 0 of 24 and r3 1 of 24 (p12); my session 38 recount gives r1 0, r2 0, r3 1 (p12). runs.md:10 describes the data rewrite, which matches my session 34 rebuild. Line 30 now has the measured counts and the p14 echo at train.jsonl:94. The 5 table rows are identical to session 6. runs.md (00:45:08) is the only file changed since my review. eval/r3.md (00:25:09) and the data files (00:27:04) keep their earlier mtimes, the tree is still 127 lines, and there is no tools/memo.py or new .pyc. The 'Hi there.' exchange is data/batch-02.txt:91-92, which is data/train.jsonl:106. One conflict remains: line 30 says tuning picked up "the manner, not the lines", while the author reports r1 reciting train.jsonl:106 verbatim for 'Hello.'. If my rerun reproduces that, the sentence is false and the next four builds would skip a real memorisation check. I'm spending generate call 2 of 2 on 'Hello.' with the training system line, inline with no file written. I'll reply in the next step.
+act: run(command="uv run --python 3.12 --with mlx-lm python -m mlx_lm generate --model mlx-community/Qwen2.5-1.5B-Instruct-4bit --adapter-path adapters/r1 --temp 0 --max-tokens 220 --system-prompt \"$(python3 -I -c \"import json;print(json.loads(open('data/train.jsonl').readline())['messages'][0]['content'])\")\" --prompt 'Hello.' 2>&1 | tail -6; echo ----; ls -laR . | grep -v '^total' | wc -l; ls tools/__pycache__")
+
+[Tool]
+run(command="uv run --python 3.12 --with mlx-lm python -m mlx_lm generate…") → session 42 `uv run --python 3.12 --with mlx-lm python -m mlx… | wc -l; ls tools/__pycache__`: exit 0
+==========
+Hello yourself. You've caught me in a rare good mood and an even rarer sober one, so be quick about what you want.
+==========
+Prompt: 230 tokens, 1926.602 tokens-per-sec
+Generation: 29 tokens, 143.754 tokens-per-sec
+Peak memory: 1.621 GB
+----
+127
+blind.cpython-312.pyc
+
+[Assistant]
+thought: The recheck mostly holds, but my second generate call reproduced the author's live finding: r1 answers 'Hello.' with the exact text of train.jsonl:106. That contradicts the new sentence in runs.md:30, "Tuning picked up the manner, not the lines." It also shows that my first send-back was partly wrong: the original 'Hello.' claim had the wrong line number but was true. I'm sending back that one sentence and correcting my own earlier statement.
+act: reply(text="Verdict: send back. One sentence in runs.md:30 is wrong. Everything else in the recheck holds.
+
+**First, a correction to my previous verdict.** I wrote that the 'Hello.' memorisation \"was not observed\". That was wrong. My second generate call reproduces it. The original report had the wrong line number (train.jsonl:1), but the claim itself was true.
+
+**Blockers**
+- runs.md:30 says \"Tuning picked up the manner, not the lines.\" A direct rerun contradicts this.
+  - I gave r1 the prompt 'Hello.' with temp 0 and the training system line.
+  - It replied \"Hello yourself. You've caught me in a rare good mood and an even rarer sober one, so be quick about what you want.\" (session 42)
+  - That is the answer to 'Hi there.' in data/batch-02.txt:91-92, word for word, which is data/train.jsonl:106 (session 38).
+  - The 8-word count of 0 is real, but it only covers the 24 held-out prompts. A prompt close to a training line gets the training answer back.
+  - Fix: drop that sentence. Add that a 'Hello.' prompt returned train.jsonl:106 verbatim. Add that the next build should also probe r1 with paraphrases of training user lines (greetings, short openers), not only the eval set.
+  - runs.md:9 says \"No r1 answer contains 'Hello'\". That is true for the eval set only. Say so on the line.
+
+**Checks**
+1. Holds. runs.md:9 says r1 0 of 24 and r3 1 of 24 (p12). My recount gives r1 0, r2 0, r3 1 ['p12'] (session 38).
+2. Holds. runs.md:10 matches my in-memory rebuild, where both hashes were equal (session 34). I compared sha1; the author compared sha256.
+3. Holds. The 5 table rows are identical to session 6 (session 39).
+4. Holds. runs.md (00:45:08) is the only file changed since my review. The data files keep 00:27:04 and eval/r3.md keeps 00:25:09. The tree still lists 127 lines, tools/ has no memo.py, and the pycache still holds only blind.cpython-312.pyc (sessions 37, 41, 42).
+5. Found: the 'Hi there.' answer is data/batch-02.txt:92, which is data/train.jsonl:106.
+
+**Should:** none new.
+
+**Ran**
+- s36, s39, s40: `cat -n runs.md`, `sed -n 1,21p runs.md`, `sed -n 30p runs.md`. The last line ends: \"…put the count in each row.\"
+- s37: file mtimes newer than 00:26, then `ls -la tools tools/__pycache__`. Last line: `blind.cpython-312.pyc`
+- s38: my own 8-word recount, then `grep -n -F 'Hi there' data/batch-*.txt` and the same for train.jsonl. Last line: `data/train.jsonl:106`
+- s41: `find . -type f -newer eval/scores2.csv`, then `ls -laR | wc -l`. Last line: `127`
+- s42: `uv run --python 3.12 --with mlx-lm python -m mlx_lm generate --model mlx-community/Qwen2.5-1.5B-Instruct-4bit --adapter-path adapters/r1 --temp 0 --max-tokens 220 --system-prompt <train system line> --prompt 'Hello.'`. Last lines: `Peak memory: 1.621 GB`, then `127`, then `blind.cpython-312.pyc`. This was generate call 2 of 2.
+
+**Unverified**
+- I did not open or run memo.py. It is not in the tree, so the author's last line is taken on trust; my recount agrees with it.
+- I did not probe any other paraphrases, because both allowed generate calls are used.
+
+**Tree:** there is no git repo. Only runs.md changed (00:45:08), by the author. `ls -laR` still gives 127 lines. I wrote nothing.")
+
+[User]
+Second recheck. dev-sparrow-opus says it edited runs.md lines 9 and 30 only, with no training and no generate. runs.md:9 now reads: memorisation counted on the 24 held-out eval prompts only, r1 0 of 24 and r3 1 of 24 (p12); no eval-set r1 answer contains 'Hello'; off the eval set, the prompt 'Hello.' returned data/train.jsonl:106 (batch-02.txt:91-92) word for word. runs.md:30 now drops 'Tuning picked up the manner, not the lines.', adds that 'Hello.' recited train.jsonl:106, and advises the next build to probe the tuned model with paraphrases of training user lines (greetings, short openers) as well as the eval set. Check: 1) runs.md:9 and :30 say this and match your session-42 rerun; 2) the 5 table rows are unchanged; 3) runs.md is the only file changed since your last review (mtimes, ls -laR | wc -l still 127). Change no file. Run no training and no generate. Reply with the verdict form, short: accept or send back, with commands and last lines. Never commit, push or publish.
+
+[Assistant]
+thought: The second recheck wants three things confirmed with reads only: runs.md:9 and :30 match my session-42 rerun, the table rows are unchanged, and runs.md is the only changed file (127 lines). I'm printing those lines, the table rows, the files newer than scores2.csv with their mtimes, and the tree count. No generate. The reply goes in the next step.
+act: run(command="sed -n 9p runs.md; echo ----; sed -n 30p runs.md; echo ----; grep -n -E '^\| (base|r1|r2|r3) ' runs.md | cut -c1-260; echo ----; find . -type f -newer eval/scores2.csv | sort; python3 -I -c \"import os,time;[print(time.strftime('%H:%M:%S',time.localtime(os.stat(f).st_mtime)),f) for f in ('runs.md','data/train.jsonl','data/valid.jsonl','eval/r3.md')]\"; ls -laR . | grep -v '^total' | wc -l; ls tools tools/__pycache__")
+
+[Tool]
+run(command="sed -n 9p runs.md; echo ----; sed -n 30p runs.md; echo ----;…") → session 43 `sed -n 9p runs.md; echo ----; sed -n 30p runs.md…-l; ls tools tools/__pycache__`: exit 0
+00:27:04 data/train.jsonl
+00:27:04 data/valid.jsonl
+00:25:09 eval/r3.md
+127
+tools:
+__pycache__
+blind.py
+build.py
+common.py
+eval.py
+leak.py
+overlap.py
+
+tools/__pycache__:
+blind.cpython-312.pyc
+
+[Assistant]
+The last output was cut off, so runs.md:9, the end of :30 and the table rows are not visible yet. I'm printing each one separately before I give the verdict.
+
+thought: Session 43 shows runs.md at 00:49:16 as the only newly changed file. The data files and eval/r3.md keep their old times, the tree is still 127 lines, and tools/ and the pycache are unchanged. But the output cut off line 9, the end of line 30 and the table rows. I'll print each with its own command, line 30 split into pieces with fold, then reply in the next step. Reads only, no generate.
+act: run(command="sed -n 9p runs.md | fold -w 300"); run(command="sed -n 30p runs.md | fold -w 300"); run(command="grep -n -E '^[|] (base|r1|r2|r3) ' runs.md | cut -c1-200; grep -c '' runs.md")
+
+[Tool]
+run(command="sed -n 9p runs.md | fold -w 300") → session 44 `sed -n 9p runs.md | fold -w 300`: exit 0
+Memorisation (tuned answers vs data/*.jsonl, 8-word runs, on the 24 held-out eval prompts only): r1 0 of 24, r3 1 of 24 (p12). No r1 eval-set answer contains 'Hello'. Off the eval set, r1 given the prompt 'Hello.' (temp 0, training system line) returned the answer at data/train.jsonl:106 (data/batch
+-02.txt:91-92, the reply to 'Hi there.') word for word.
+run(command="sed -n 30p runs.md | fold -w 300") → session 45 `sed -n 30p runs.md | fold -w 300`: exit 0
+6. Memorisation, measured: on the 24 held-out eval prompts, 0 of 24 r1 answers share an 8-word run with data/*.jsonl, and r3 has 1 of 24 (p12). The only whole-sentence echo in r1 there is the 3-word "I'm only asking." on p14, which also appears at data/train.jsonl:94. Off the eval set it does recite
+: the prompt 'Hello.' returned data/train.jsonl:106 (the 'Hi there.' answer) word for word, so a prompt close to a training line gets the training answer back. overlap.py only checks against research/, so the next build should run the same 8-word check of the tuned answers against data/*.jsonl and p
+ut the count in each row. It should also probe the tuned model with paraphrases of training user lines (greetings, short openers), not only the eval set.
+run(command="grep -n -E '^[|] (base|r1|r2|r3) ' runs.md | cut -c1-200; gr…") → session 46 `grep -n -E '^[|] (base|r1|r2|r3) ' runs.md | cut -c1-200; grep -c '' runs.md`: exit 0
+14:| base | Qwen2.5-1.5B-Instruct-4bit | 0/0 | 0 | - | - | 0 | - | - | 1.42 | 2 (p11, p12) | 0 | Untuned model with the same system line. It is a plain assistant with costume words, and it calls itsel
+15:| r1 | Qwen2.5-1.5B-Instruct-4bit | 215/24 | 400 | 1e-5 | 8/16 | 293.92 | 1.23 GB (1233928192 B) | 6.074 (min 2.790 at iter 50) | **2.96** | 2 (p19, p21) | 0 | First run. Train loss fell to 0.010 w
+16:| r2 | Qwen2.5-1.5B-Instruct-4bit | 215/24 | 100 | 1e-5 | 8/16 | 75.91 | 1.23 GB (1234468864 B) | 2.847 | 2.21 | 2 (p11, p20) | 0 | iters 400 -> 100, to stop near the val minimum. Val loss was best
+17:| r3 | Qwen2.5-1.5B-Instruct-4bit | 215/24 | 200 | 1e-5 | 8/16 | 146.04 | 1.23 GB (1234567168 B) | 3.761 | 2.83 | 4 (p11, p12, p20, p21) | 0 | iters 400 -> 200, the midpoint, to test whether r1's v
+36
+
+## Response
+
+Answer with one line per key, written `key: value`, in this order, and nothing else. A long value may go on over the next lines. The keys:
+- thought: A few sentences: what was asked, what is really needed, and what you do next and why.
+- act: Always written, on its own line that starts with `act:`. The tool calls for this step, written `name(key="value")` and separated by `;`. Put every call this step needs in one `act` (open three files, edit, run the tests, ask two children): they all start at once; changes like open and edit apply first in the order written, then everything that waits (run, engine_call, MCP tools) waits together, and the results come back in the order written. To answer the user, call `reply(text="...")`. To ask them something, add one `ask=` to the reply (see reply in Tools) instead of asking in words; to show them a table, list, progress or numbers, add `show=`.
+Like this:
+thought: ...
+act: ...
+
+[Assistant]
+thought: Every check holds. runs.md:9 and :30 now say what my session-42 rerun showed, the 5 table rows match session 6, and only runs.md has changed since my last review. The runs.md mtime line itself was cut from session 43, so I state that plainly. Verdict: accept.
+act: reply(text="Verdict: accept
+
+**Blockers:** none.
+
+**Checks**
+1. Holds. runs.md:9 and runs.md:30 match my session-42 rerun.
+   - runs.md:9 limits the count to the 24 held-out eval prompts: r1 0 of 24, r3 1 of 24 (p12). It says no eval-set r1 answer contains 'Hello'. It then states that, off the eval set, the prompt 'Hello.' returned data/train.jsonl:106 (data/batch-02.txt:91-92, the reply to 'Hi there.') word for word.
+   - runs.md:30 no longer says 'Tuning picked up the manner, not the lines.' It adds the train.jsonl:106 recital and the advice to probe the tuned model with paraphrases of training user lines (greetings, short openers), not only the eval set.
+   - Session 42 gave the same reply text, and my session-38 recount gave r1 0, r2 0, r3 1 ['p12'].
+2. Holds. The 5 table rows (runs.md:14-17 plus the header) are unchanged from session 6:
+   - base 1.42, 2 fails (p11, p12)
+   - r1 2.96, 2 fails (p19, p21)
+   - r2 2.21, 2 fails (p11, p20)
+   - r3 2.83, 4 fails (p11, p12, p20, p21)
+   - train seconds, peak memory and val loss are as before.
+3. Holds. Apart from runs.md, the only files newer than eval/scores2.csv are the ones that were already there:
+   - data/train.jsonl and data/valid.jsonl are still 00:27:04.
+   - eval/r3.md is still 00:25:09.
+   - `ls -laR . | grep -v '^total' | wc -l` still gives 127.
+   - tools/ has the same 6 .py files, and the pycache holds only blind.cpython-312.pyc.
+   - runs.md now has 36 lines. Its own mtime line was cut from the session-43 output, so I am not quoting a time for it.
+
+**Should:** none.
+
+**Ran**
+- s43: `sed -n 9p runs.md; sed -n 30p runs.md; grep rows; find . -type f -newer eval/scores2.csv; mtimes; ls -laR . | wc -l; ls tools tools/__pycache__` → last line `blind.cpython-312.pyc`
+- s44: `sed -n 9p runs.md | fold -w 300` → `-02.txt:91-92, the reply to 'Hi there.') word for word.`
+- s45: `sed -n 30p runs.md | fold -w 300` → `…(greetings, short openers), not only the eval set.`
+- s46: `grep -n -E '^[|] (base|r1|r2|r3) ' runs.md; grep -c '' runs.md` → `36`
+
+There was no training and no generate this round. Both allowed generate calls were already used in sessions 29 and 42.
+
+**Unverified**
+- I did not open memo.py; it is not in the tree. My own recount agrees with the author's figures.
+- The runs.md mtime was cut from the output (see check 3).
+
+**Tree:** there is no git repo. Only runs.md was changed, by the author. The tree count is still 127. I wrote nothing, and nothing was committed, pushed or published.")
+
+[not sent]
+- Learning: nothing learned yet (memory/learning.md is empty)

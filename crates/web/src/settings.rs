@@ -8,6 +8,12 @@ use serde_json::{Value, json};
 /// LM Studio on this machine, its default port.
 pub const DEFAULT_ENDPOINT: &str = "http://localhost:1234/v1";
 
+/// The local model servers asked on a first visit, in order, by name and
+/// endpoint: each one's own default port. `localhost`, not `127.0.0.1`:
+/// a hosted (https) page may call `http://localhost` (docs/browser.md).
+pub const LOCAL_SERVERS: &[(&str, &str)] =
+    &[("LM Studio", DEFAULT_ENDPOINT), ("oMLX", "http://localhost:8873/v1"), ("Ollama", "http://localhost:11434/v1")];
+
 /// Where the settings live in the store.
 pub const PATH: &str = "local/settings.json";
 

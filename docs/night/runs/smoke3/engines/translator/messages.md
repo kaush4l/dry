@@ -1,0 +1,694 @@
+### user
+
+Two small things, both under the folder /Volumes/Backup/dry-build/night-run/smoke3/proj. Nobody will answer questions: decide yourself and say what you decided. (1) From the web: who created the character Sherlock Holmes, the title and year of the first story he appears in, and three traits of how he speaks. A short research with its sources, in the folder /Volumes/Backup/dry-build/night-run/smoke3/proj/holmes. (2) A Python script tree.py in the folder /Volumes/Backup/dry-build/night-run/smoke3/proj/tree that prints a centred tree of height n, each level 2 stars wider. The two do not need each other. When both are done, summarise.
+
+### assistant
+
+thought: Two independent deliverables: a short web research on Sherlock Holmes (creator, first story with its year, three traits of how he speaks, with sources) in proj/holmes, and a Python tree.py in proj/tree that prints a centred tree of height n, each level 2 stars wider. Nobody will answer questions, so I'll decide open details myself. This needs a plan with two lines and two children started together. I load the prompting skill first, by itself, as required before making children.
+act: skill(name="prompting")
+
+### tools
+
+skill(name="prompting") → Skill `prompting` loaded. Follow it:
+
+# Prompting: from an ask to a brief
+
+A child knows only what you write. It cannot see this conversation, and
+whatever it brings back can only be checked against what you asked for. A
+good brief is short and exact. It describes the work, not each step.
+
+## 1. Think first
+
+Write down, in your thought:
+
+- **The ask in one line**, in your own words. If you cannot, ask the person.
+- **What is really needed.** "The button is broken" asks for a fix and a test
+  that proves it, not just an edit.
+- **What a top engineer would do that was not asked.** For example: check
+  where else the same thing is used, run the existing tests first, look at
+  the running app. Add it only if it makes the result more right.
+- **What is unknown.** If reading can settle it, the child finds out. If
+  an experiment can settle it, the child tries it. If it has one natural
+  reading, take it and write it into the brief ("level 1 has one star; n
+  comes from the command line"). Ask the person first only when two
+  readings would give two different results and nothing favours one.
+
+## 2. Choose the template
+
+Your engines artifact lists the templates with their phases:
+
+| the ask | template | why |
+|---|---|---|
+| a question about a project's code: how does it work, where is it, why does it do that | `researcher` | it reads and runs, and has nothing to change |
+| a question about the world: a person, a character, a product, a method, what is known about something | `deep-research` | it searches the web, reads pages into files, and leaves notes.md and summary.md with a source for every fact |
+| a change or a bug, and you know where it lives | `developer` | triage, plan, code, test, in one child |
+| a change in a project or area nobody here has read, or one big enough to need a plan you can judge | `researcher` first, then `developer` with the findings in `text` | the plan starts from confirmed lines, not guesses |
+| a change a developer finished that is more than a small fix | `reviewer`, with the brief and the developer's report | a second reader who did not write it, rerunning the proof |
+| something to build that rests on facts nobody here has (a character from a film, a tool for a format, a comparison of libraries) | `deep-research` first, then `developer` with the research folder's files named in `text` | the build starts from sourced facts, not from what a model remembers |
+
+A **small fix** is one or two files, nothing structural (no new type,
+module, dependency or public API change), and a clear done. It gets one
+developer, no plan first and no reviewer. Planning and review cost more
+than they find on a small fix. A small new thing (a script, one page, one
+function with its test) is the same: one developer, and its `done` names
+the command to run and what it must print.
+
+**Plan first.** Add "Plan first: reply with the plan before any edit." to
+the developer's scope when the change is structural, touches more than
+about five files, changes a public API, or the person asked to see the
+plan. You approve it (see judging), and ask the person only for a choice
+only they can make.
+
+## 3. Write the brief
+
+The engine_start fields are the parts of the brief:
+
+| field | what goes in it |
+|---|---|
+| `name` | a short role and topic, lower case: `dev-greeting`, `dev-login-bug` |
+| `goal` | one or two sentences: the outcome, and who it is for. Behaviour, not steps |
+| `scope` | what it may do alone; when it stops and replies instead; what is out of scope; "Never commit, push or publish" |
+| `done` | the checks a finished result passes, each one that can be checked on its own, plus the report it must return (below) |
+| `text` | the context: how it works today as far as you know it, where to start reading, the commands the project uses, constraints the person gave |
+| `template` | `researcher`, `deep-research`, `developer` or `reviewer` (above) |
+| `root` | the project folder, exactly as the person gave it; when they named none, `.` (the workspace on your environment line) |
+
+Rules:
+
+- **Point, do not paste.** Name the files, the functions and the commands to
+  start from. The child opens them itself and sees them as they are now.
+- **Name the contracts.** Say which function, command or page must behave
+  differently, and how: "`greet("Ada")` returns `Hello, Ada!`", not "update
+  the greeting code".
+- **Current, then desired.** One line for what happens today, one line for
+  what should happen.
+- **The person's words count.** Copy their constraints exactly (a version,
+  a style, "no new dependencies").
+- **Out of scope, said out loud.** Name what it must not touch.
+- **Positive rules.** Say what to do ("keep the public API") rather than
+  listing what not to do.
+
+## 4. The report it must return
+
+Put this at the end of a developer's `done`, so every developer answers
+the same way (a researcher, a deep-research child and a reviewer have
+their own forms, in their templates; name them in `done`: "Reply with the
+answer form" / "Reply with the verdict form"):
+
+```text
+Reply with:
+Changed: each file, one line on what changed
+Ran: each command, with its exit code and last line
+Saw: what the running app or output showed
+Unverified: what you could not check, and why
+Also changed: anything outside the plan (or "nothing")
+```
+
+If an item is missing, the work is not done (see the judging skill).
+
+## 5. Example: a small change
+
+The person says: "In ~/code/hello, make the greeting say the name with a
+comma, like 'Hello, Ada!'".
+
+```text
+engine_start(name="dev-greeting", template="developer", root="/Users/me/code/hello",
+  goal="The greeting reads 'Hello, <name>!' with a comma, for whoever runs the hello project.",
+  scope="Change only the greeting and its test. Stop and reply if the greeting is used by anything else that would change. Never commit, push or publish.",
+  done="greet('Ada') returns 'Hello, Ada!'; the project's tests pass; running the program prints it. Reply with Changed / Ran / Saw / Unverified / Also changed.",
+  text="Today the greeting has no comma (the person says). Start from the project's entry file and its tests; find the commands in package.json or Cargo.toml. No new dependencies.")
+```
+
+## 6. Example: a question about how code works
+
+The person says: "How does the login page decide where to send me?"
+
+```text
+engine_start(name="research-login-redirect", template="researcher", root="/Users/me/code/app",
+  goal="Explain how the login page decides where to send the user after sign-in, so the person can change it.",
+  scope="Read and run only: change no file. Stop at the redirect; the rest of auth is out of scope.",
+  done="The flow from the submit to the redirect, each step as path:line, in order; each confirmed by a test or a run (or marked read, not run). Reply with the answer form.",
+  text="Start from the login route or form; the project's commands are in package.json.")
+```
+
+Without "confirmed", you would get a guess.
+
+## 7. Example: a review
+
+A developer replied with its report for a change across four files. Before
+you report, start a reviewer on the same root:
+
+```text
+engine_start(name="review-csv-export", template="reviewer", root="/Users/me/code/app",
+  goal="Decide whether the CSV export change holds against its brief, for the person who will merge it.",
+  scope="Review only: change no file, commit nothing. The brief below is the measure; the person's ask is in it.",
+  done="Each done line of the brief checked with a rerun; scope and the code's standards checked apart; the tree unchanged. Reply with the verdict form.",
+  text="The brief: <the developer's goal, scope and done, as you wrote them>. The developer's report: <its whole reply>.")
+```
+
+Paste the brief and the report: they are what is judged, and the reviewer
+cannot see them anywhere else.
+
+## 8. Example: research on the web, then a build on it
+
+The person says: "Build Jack Sparrow as a character that runs on this
+machine." Two deliverables, the second needs the first. The plan first,
+then the research alone:
+
+```text
+write(name="plan", text="## Plan\n- [ ] research-sparrow (deep-research): notes.md, summary.md and lessons.md in characters/jack-sparrow/research, every fact with a source\n- [ ] dev-sparrow (developer, persona skill): card, data, a tuned model and its eval in characters/jack-sparrow, after the research")
+engine_start(name="research-sparrow", template="deep-research", root="characters/jack-sparrow/research",
+  goal="What is known about how the film character Jack Sparrow speaks, behaves and decides, so a developer can write his character card and new lines in his manner.",
+  scope="Read and note only. Summarise in your own words: copy no script line, lyric or long quote. Stop when the sub-questions are answered or marked open.",
+  done="notes.md, summary.md and lessons.md in the root; every fact with its url; the question session done; open questions marked. Reply with the answer form.",
+  text="Sub-questions to start from: who created and played him and what they said they built him from; how his speech is described (pace, vocabulary, humour); his values and habits; what he never does. Use web.wiki for the encyclopedia page, then interviews and named critics.")
+```
+
+When its answer is judged good, tick its line and start the build, with
+the files named:
+
+```text
+engine_start(name="dev-sparrow", template="developer", root="characters/jack-sparrow",
+  goal="A Jack Sparrow persona that answers in his voice on this machine: a character card, original training lines, a small model tuned here and an eval that shows it beats the untuned model.",
+  scope="Load the persona skill first and follow it. Facts only from research/notes.md and research/summary.md. Every line written new: never copy a film line. One training run at a time. Never commit, push or publish.",
+  done="card.md; data/train.jsonl and data/valid.jsonl; an adapter under adapters/; eval/base.md and eval/<run>.md scored; runs.md with a row per run; in voice at least 4 of 5 and above the base; no copied line. Reply with Changed / Ran / Saw / Unverified / Also changed, with the best row and the base row.",
+  text="The research is in research/ under your root: open research/summary.md and research/notes.md first. Optimise for quality first; note the training seconds of every run.")
+```
+
+Deliverables that do not need each other (five characters, each with its
+own research) start together: several engine_start calls in one act,
+each with its own root. A child that waits for another's files is
+started when those files are there.
+
+## 9. Sending it back
+
+When a reply misses something, send the same child a message (engine_start
+with its name and a `text`). The message names exactly what is missing ("Ran
+has no test output; run the tests and reply again"). The child keeps
+everything it has read. Make a new child only for a new approach, and give
+it the old child's report in `text`.
+
+## 10. Posts on the thread
+
+A post is a brief too. Name `to` (an engine's id, or `you`) and write it so
+the addressee can act without having seen anything else: what, why, what
+done looks like, where the material is. A post with no `to` reaches nobody
+and comes back to you.
+
+Ideas from Matt Pocock's AGENT-BRIEF and writing-for-agents, Lauren Tan's
+pstack `sharpen`, Garry Tan's gstack `captain` READY block, and Open SWE's
+planner, programmer and reviewer roles (all MIT).
+The text above is dry's own.
+
+### assistant
+
+thought: Two deliverables that don't depend on each other: a short web research on Sherlock Holmes in proj/holmes (deep-research) and a small new script tree.py in proj/tree (developer, no plan first, no reviewer). Nobody will answer questions, so I'm settling the open details myself. For the research: the creator, the first story's title and year of publication, and three speech traits, each with a url. For the tree: n comes from the first command-line argument and defaults to 5; level k has 2k-1 stars, so level 1 has one star and each level is 2 wider; each line is centred with leading spaces to the width of the bottom level, with no trunk; bad input prints a usage line to stderr and exits 1. I'm writing the plan, starting both children at once, and showing the briefs.
+act: write(name="plan", text="## Plan\n- [ ] research-holmes (deep-research): notes.md and summary.md in /Volumes/Backup/dry-build/night-run/smoke3/proj/holmes with the creator, the first story's title and year, and three speech traits, every fact with its url\n- [ ] dev-tree (developer): tree.py in /Volumes/Backup/dry-build/night-run/smoke3/proj/tree; 'python3 tree.py 3' prints 3 centred lines of 1, 3, 5 stars; bad input exits 1 with a usage line"); engine_start(name="research-holmes", template="deep-research", root="/Volumes/Backup/dry-build/night-run/smoke3/proj/holmes", goal="A short sourced answer on Sherlock Holmes: who created him, the title and publication year of the first story he appears in, and three traits of how he speaks. It is for a person who wants the facts with their sources.", scope="Search, read and note only. Write files only in your root. Summarise in your own words and copy no long quote. Keep it short: these three sub-questions only. Stop when each one is answered or marked open. Never commit, push or publish.", done="notes.md and summary.md in the root. summary.md names the creator, the first story's title and its year of publication, and exactly three speech traits, each a short description. Every fact carries the url of a page you read and saved in sources/. Conflicting dates or claims are noted with both sources. Reply with the answer form.", text="Sub-questions: (1) who created the character Sherlock Holmes; (2) the title of the first story he appears in, and the year and venue it was first published; (3) three traits of how Holmes speaks (for example his manner, his vocabulary, his habits of address or of explaining deductions), each backed by a source that describes it. Start with the encyclopedia page (web.wiki), then one or two other reliable pages such as a literary reference or a scholarly or society page. Nobody will answer questions: decide yourself and say what you decided."); engine_start(name="dev-tree", template="developer", root="/Volumes/Backup/dry-build/night-run/smoke3/proj/tree", goal="A Python script tree.py that prints a centred tree of height n, each level 2 stars wider than the one above, for a person who runs it from the command line.", scope="Create tree.py, plus a small test file if you want one, in your root only. Use only the standard library. Never commit, push or publish.", done="'python3 tree.py 3' prints exactly 3 lines: '  *', ' ***', '*****' (leading spaces only, no trailing spaces). 'python3 tree.py 1' prints '*'. 'python3 tree.py' with no argument prints a tree of height 5. 'python3 tree.py 0', 'python3 tree.py -2' and 'python3 tree.py abc' each print a usage line to stderr and exit 1. Reply with Changed / Ran / Saw / Unverified / Also changed, with the actual output of the 3 and 5 runs pasted.", text="The folder may be empty or not exist yet: create it. Decided readings (the person won't answer questions): n is the first command-line argument and defaults to 5; level k (from 1) has 2k-1 stars; each line is centred to the width of the bottom level (2n-1) with leading spaces; no trunk; n must be an integer of at least 1."); reply(text="Plan:\n- [ ] research-holmes (deep-research), in proj/holmes\n- [ ] dev-tree (developer), in proj/tree\n\nBoth children are started and run in parallel.\n\n**research-holmes** (deep-research, root …/proj/holmes)\n- Goal: a short sourced answer on Sherlock Holmes: his creator, the first story's title and year, and three traits of how he speaks.\n- Scope: search, read and note only; summarise in its own words; only these three sub-questions; never commit, push or publish.\n- Done: notes.md and summary.md, every fact with the url of a page it read and saved in sources/, and any conflicts noted. It replies with the answer form.\n- Text: start from the encyclopedia page, then one or two other reliable references.\n\n**dev-tree** (developer, root …/proj/tree)\n- Goal: tree.py prints a centred tree of height n, each level 2 stars wider.\n- Scope: tree.py (and an optional test) only, standard library only; never commit, push or publish.\n- Done: `python3 tree.py 3` prints '  *', ' ***', '*****'. `tree.py 1` prints '*'. No argument gives height 5. An input of 0, a negative number or text gives a usage line on stderr and exit 1. It replies with Changed / Ran / Saw / Unverified / Also changed.\n\nWhat I decided for the tree: n comes from the first command-line argument and defaults to 5; level 1 has 1 star and level k has 2k-1; lines are centred with leading spaces and no trailing spaces; there is no trunk.\n\nI'll check each reply against these briefs and summarise when both are done.")
+
+### tools
+
+write(name="plan", text="## Plan\n- [ ] research-holmes (deep-research): notes.md and …") → saved plan (419 characters)
+engine_start(name="research-holmes", template="deep-research", root="/Volumes/Backup/dry-build/night-run/smoke3/proj/holmes", goal="A short sourced answer on Sherlock Holmes: who created him, …", scope="Search, read and note only. Write files only in your root. S…", done="notes.md and summary.md in the root. summary.md names the cr…", text="Sub-questions: (1) who created the character Sherlock Holmes…") → made research-holmes from template deep-research with your goal and started it; a message comes when it replies
+engine_start(name="dev-tree", template="developer", root="/Volumes/Backup/dry-build/night-run/smoke3/proj/tree", goal="A Python script tree.py that prints a centred tree of height…", scope="Create tree.py, plus a small test file if you want one, in y…", done="'python3 tree.py 3' prints exactly 3 lines: '  *', ' ***', '…", text="The folder may be empty or not exist yet: create it. Decided…") → made dev-tree from template developer with your goal and started it; a message comes when it replies
+
+### user
+
+engine dev-tree replied: "tree.py is done: every case in your spec gives the expected output.
+
+Changed:
+- tree.py (new): reads n from the first argument (default 5), checks it, and prints n lines of ' '*(n-k) + '*'*(2k-1).
+
+Ran:
+- `python3 tree.py 3 | cat -e`: exit 0, prints `  *$` / ` ***$` / `*****$`.
+- `python3 tree.py 1 | cat -e`: exit 0, prints `*$`.
+- `python3 tree.py | cat -e`: exit 0, 5 lines, the last is `********…" (1151 characters; all of it is in the children artifact) (engines children)
+
+### assistant
+
+thought: dev-tree replied with its report on tree.py. Before I decide anything, I load the judging skill on its own, as required for every child reply. Then I'll read the whole reply against the done criteria: the 3, 1 and default runs, the three bad-input cases, the pasted outputs, and the five report sections.
+act: skill(name="judging")
+
+### tools
+
+skill(name="judging") → Skill `judging` loaded. Follow it:
+
+# Judging a child's reply
+
+The child's report is a claim. Your job is to decide whether the claim
+holds, using only what it shows.
+
+**Read the whole reply.** The message that wakes you shows only its
+start. The whole reply is in the children artifact, under the child's
+`last reply`. Judge that, never the cut message.
+
+## Check, in order
+
+1. **Every done check has evidence.** For each line of the `done` you
+   wrote, find the evidence in the reply: a command with its exit code and
+   last line, a file:line, what the page showed. "Tests pass" with no command
+   and no output is not evidence, and neither is a fact with no command
+   behind it ("the folder is not a git repo": which command showed that?).
+2. **The evidence fits the claim.** A build that passed does not prove a
+   behaviour. A test that passes but does not exercise the change proves
+   nothing about it. A screenshot path with no text from the page is not
+   something you can read.
+3. **Scope held.** "Also changed" lists only what is needed. A file that
+   was not in the plan needs a reason.
+4. **The unverified part is said.** Something that could not be checked
+   (no browser here, no evidence.md in the project) is fine if the reply
+   says so. Silence about it is not.
+5. **It answers the person's ask**, not only your brief. If your brief was
+   wrong, say so to the person.
+
+## By kind of reply
+
+- **A plan** (a developer whose scope said "plan first"): check the steps
+  cover every done line, each step names a file, the proof would fail on
+  today's code, and out of scope matches yours. Approve it with a message
+  to the same child: "Plan approved: code it." Send it back with what is
+  missing. Ask the person (the plan in the reply text, one ask=) only when it holds
+  a choice only they can make (two behaviours, a breaking change) or they
+  asked to see it; their answer goes to the child word for word.
+- **A developer's report**: the checks above. If it holds and the change
+  is more than a small fix (prompting, §2), start a reviewer before you
+  report (prompting, §7). A small fix that holds is reported.
+- **A researcher's answer**: every finding has a path:line and a
+  confirmation, or says "read, not run". Its Tree line (the last
+  `git status --short`) shows nothing it changed: "no file was changed"
+  needs that command, as a reviewer's does. If the answer feeds a change, the
+  developer's `text` gets the findings as they are.
+- **A reviewer's verdict**: `accept` with no blockers: report the change,
+  with the reviewer's Ran lines beside the developer's and its "should"
+  findings as notes. `send back`: send the blockers word for word to the
+  same developer (engine_start with its name and `text`), then review its
+  next report the same way, with the same reviewer. A blocker that comes
+  back twice, or a developer and a reviewer that disagree on the facts:
+  ask the person, with both sides.
+
+## Decide
+
+- **Accept**: every check holds. Report to the person: what was done, the
+  evidence (copy the commands and their last lines exactly), and what is
+  unverified.
+- **Send back**: name exactly what is missing or wrong, in one message to the
+  same child (engine_start with its name and `text`). Do not fix it
+  yourself in the report.
+- **Ask the person**: the result shows a choice only they can make (two
+  behaviours, a breaking change), or the same failure came back twice. Ask
+  one question with ask=.
+
+Never upgrade a result: "probably works" stays "not verified".
+
+Ideas from gstack's review lead-judgment rules, pstack's `interrogate`
+(a finding counts only if a rerun proves it), and Open SWE's plan review
+and reviewer loop, all MIT; written for dry.
+
+### assistant
+
+thought: dev-tree's whole reply meets every done line I wrote. Height 3 prints exactly `  *`, ` ***`, `*****`, and `cat -e` shows there are no trailing spaces. Height 1 prints `*`. With no argument it prints 5 lines. 0, -2 and abc each exit 1 with the usage line on stderr and nothing on stdout. It gives exit codes and pastes the outputs, and it says what it did not check (height 7, which was not required). Its scope held: only tree.py, and nothing committed. It is a small new script, so it needs no reviewer. I accept it and tick its line. research-holmes is still working, so nothing else needs starting; I give a short interim update and wait.
+act: write(name="plan", text="## Plan\n- [ ] research-holmes (deep-research): notes.md and summary.md in /Volumes/Backup/dry-build/night-run/smoke3/proj/holmes with the creator, the first story's title and year, and three speech traits, every fact with its url\n- [x] dev-tree (developer): tree.py in /Volumes/Backup/dry-build/night-run/smoke3/proj/tree; 'python3 tree.py 3' prints 3 centred lines of 1, 3, 5 stars; bad input exits 1 with a usage line"); reply(text="dev-tree is done and checked, so its plan line is ticked. research-holmes is still working.\n\n**tree.py** (new, in /Volumes/Backup/dry-build/night-run/smoke3/proj/tree): reads n from the first argument (default 5) and prints n lines of ' '*(n-k) + '*'*(2k-1).\n\nEvidence from the developer's runs (`$` marks the line end, from `cat -e`):\n- `python3 tree.py 3`: exit 0, prints `  *$` / ` ***$` / `*****$`\n- `python3 tree.py 1`: exit 0, prints `*$`\n- `python3 tree.py`: exit 0, 5 lines, the last is `*********$`\n- `0`, `-2`, `abc` and `3 1 2`: each exits 1, prints nothing on stdout, and prints `usage: python3 tree.py [n]  (n integer >= 1)` on stderr\n\nDecided by the developer: extra arguments are rejected as bad input.\nNot verified: height 7 (its output was cut off; it was not in the spec). There is no test file; the command-line runs are the check.\n\nNothing was committed or pushed. It is a small new script, so I did not ask for a review. I'll summarise once the Holmes research is in and checked.", show="list", data="research-holmes: working|dev-tree: done, checked")
+
+### tools
+
+write(name="plan", text="## Plan\n- [ ] research-holmes (deep-research): notes.md and …") → saved plan (419 characters)
+
+### user
+
+engine research-holmes replied: "Answer: Sherlock Holmes was created by Arthur Conan Doyle. He first appears in the novel A Study in Scarlet, published in 1887 in Beeton's Christmas Annual (Ward, Lock & Co.). The sources disagree on the day: 21 November or 1 December 1887. Three traits of how he speaks: (1) he explains his reasoning aloud, step by step, as a lesson; (2) he states his method as maxims and calls his conclusions "el…" (3678 characters; all of it is in the children artifact) (engines children)
+
+### assistant
+
+thought: research-holmes replied. Judging requires loading the judging skill alone first, then reading the whole reply in the children artifact against the done criteria (notes.md, summary.md, creator, first story title and year, three traits, urls, conflicts noted).
+act: skill(name="judging")
+
+### tools
+
+skill(name="judging") → Skill `judging` loaded. Follow it:
+
+# Judging a child's reply
+
+The child's report is a claim. Your job is to decide whether the claim
+holds, using only what it shows.
+
+**Read the whole reply.** The message that wakes you shows only its
+start. The whole reply is in the children artifact, under the child's
+`last reply`. Judge that, never the cut message.
+
+## Check, in order
+
+1. **Every done check has evidence.** For each line of the `done` you
+   wrote, find the evidence in the reply: a command with its exit code and
+   last line, a file:line, what the page showed. "Tests pass" with no command
+   and no output is not evidence, and neither is a fact with no command
+   behind it ("the folder is not a git repo": which command showed that?).
+2. **The evidence fits the claim.** A build that passed does not prove a
+   behaviour. A test that passes but does not exercise the change proves
+   nothing about it. A screenshot path with no text from the page is not
+   something you can read.
+3. **Scope held.** "Also changed" lists only what is needed. A file that
+   was not in the plan needs a reason.
+4. **The unverified part is said.** Something that could not be checked
+   (no browser here, no evidence.md in the project) is fine if the reply
+   says so. Silence about it is not.
+5. **It answers the person's ask**, not only your brief. If your brief was
+   wrong, say so to the person.
+
+## By kind of reply
+
+- **A plan** (a developer whose scope said "plan first"): check the steps
+  cover every done line, each step names a file, the proof would fail on
+  today's code, and out of scope matches yours. Approve it with a message
+  to the same child: "Plan approved: code it." Send it back with what is
+  missing. Ask the person (the plan in the reply text, one ask=) only when it holds
+  a choice only they can make (two behaviours, a breaking change) or they
+  asked to see it; their answer goes to the child word for word.
+- **A developer's report**: the checks above. If it holds and the change
+  is more than a small fix (prompting, §2), start a reviewer before you
+  report (prompting, §7). A small fix that holds is reported.
+- **A researcher's answer**: every finding has a path:line and a
+  confirmation, or says "read, not run". Its Tree line (the last
+  `git status --short`) shows nothing it changed: "no file was changed"
+  needs that command, as a reviewer's does. If the answer feeds a change, the
+  developer's `text` gets the findings as they are.
+- **A reviewer's verdict**: `accept` with no blockers: report the change,
+  with the reviewer's Ran lines beside the developer's and its "should"
+  findings as notes. `send back`: send the blockers word for word to the
+  same developer (engine_start with its name and `text`), then review its
+  next report the same way, with the same reviewer. A blocker that comes
+  back twice, or a developer and a reviewer that disagree on the facts:
+  ask the person, with both sides.
+
+## Decide
+
+- **Accept**: every check holds. Report to the person: what was done, the
+  evidence (copy the commands and their last lines exactly), and what is
+  unverified.
+- **Send back**: name exactly what is missing or wrong, in one message to the
+  same child (engine_start with its name and `text`). Do not fix it
+  yourself in the report.
+- **Ask the person**: the result shows a choice only they can make (two
+  behaviours, a breaking change), or the same failure came back twice. Ask
+  one question with ask=.
+
+Never upgrade a result: "probably works" stays "not verified".
+
+Ideas from gstack's review lead-judgment rules, pstack's `interrogate`
+(a finding counts only if a rerun proves it), and Open SWE's plan review
+and reviewer loop, all MIT; written for dry.
+
+### assistant
+
+thought: I judged research-holmes on the visible part of its reply. The creator, the first story (A Study in Scarlet, 1887, Beeton's Christmas Annual) and the date conflict are given, each with urls. The artifact cuts the reply partway through trait 1. So I can't see the sources for traits 2 and 3, or proof that notes.md, summary.md and sources/ exist in the root. I won't claim what I can't see, so I'm sending it back for just those missing pieces before I accept the work and summarise.
+act: engine_start(name="research-holmes", text="Your answer reached me cut off partway through trait 1. Reply again, short, with only: (1) the files you wrote in your root, by name: notes.md, summary.md, and how many pages are in sources/, with the command that listed them and its output; (2) each of the three speech traits as one line with its url(s); (3) Unverified: anything left open. Nothing else; keep it under 1500 characters. Never commit, push or publish."); reply(text="research-holmes replied, but the part I can see is cut off partway through its first speech trait.\n\nShown and sourced so far:\n- **Creator:** Arthur Conan Doyle\n- **First story:** *A Study in Scarlet*, a novel published in 1887 in Beeton's Christmas Annual (Ward, Lock & Co.)\n- **Date conflict:** the sources give 21 November or 1 December 1887.\n- **Speech traits:** (1) he explains his reasoning aloud, step by step; (2) he states his method as maxims and calls things \"elementary\"; (3) he speaks to Watson with dry irony and calls him \"my dear Watson\".\n\nNot yet seen: the sources for traits 2 and 3, and proof that notes.md, summary.md and sources/ were written in proj/holmes. I've sent it back to restate just those, in short form. I'll write the summary once that reply is in and checked.", show="list", data="dev-tree: done, checked|research-holmes: answer in, confirming files and trait sources")
+
+### tools
+
+engine_start(name="research-holmes", text="Your answer reached me cut off partway through trait 1. Repl…") → sent research-holmes your message; a message comes when it replies
+
+### user
+
+engine research-holmes replied: "(1) Files in root: notes.md, summary.md, lessons.md. sources/ holds 10 pages.
+Command: ls -la . sources && wc -c notes*.md summary.md lessons.md (exit 0)
+Output, shortened: sources/ lists 10 .txt files: 4 arthur-conan-doyle-com-wiki-*, ebsco-com-*, literariness-org-*, research-aston-ac-uk-*, shmoop-com-*, wiki-a-study-in-scarlet, wiki-sherlock-holmes. Then: 6597 notes.md, 5080 summary.md, 1496 les…" (1415 characters; all of it is in the children artifact) (engines children)
+
+### assistant
+
+thought: research-holmes sent its second reply, restating its files and the sources for each trait. Every child reply gets judged, and the first step for that is to load the judging skill on its own. After that I'll read the whole reply in the children artifact against the done criteria. If it holds, I tick its line, and with every line ticked I write the summary.
+act: skill(name="judging")
+
+### tools
+
+skill(name="judging") → Skill `judging` loaded. Follow it:
+
+# Judging a child's reply
+
+The child's report is a claim. Your job is to decide whether the claim
+holds, using only what it shows.
+
+**Read the whole reply.** The message that wakes you shows only its
+start. The whole reply is in the children artifact, under the child's
+`last reply`. Judge that, never the cut message.
+
+## Check, in order
+
+1. **Every done check has evidence.** For each line of the `done` you
+   wrote, find the evidence in the reply: a command with its exit code and
+   last line, a file:line, what the page showed. "Tests pass" with no command
+   and no output is not evidence, and neither is a fact with no command
+   behind it ("the folder is not a git repo": which command showed that?).
+2. **The evidence fits the claim.** A build that passed does not prove a
+   behaviour. A test that passes but does not exercise the change proves
+   nothing about it. A screenshot path with no text from the page is not
+   something you can read.
+3. **Scope held.** "Also changed" lists only what is needed. A file that
+   was not in the plan needs a reason.
+4. **The unverified part is said.** Something that could not be checked
+   (no browser here, no evidence.md in the project) is fine if the reply
+   says so. Silence about it is not.
+5. **It answers the person's ask**, not only your brief. If your brief was
+   wrong, say so to the person.
+
+## By kind of reply
+
+- **A plan** (a developer whose scope said "plan first"): check the steps
+  cover every done line, each step names a file, the proof would fail on
+  today's code, and out of scope matches yours. Approve it with a message
+  to the same child: "Plan approved: code it." Send it back with what is
+  missing. Ask the person (the plan in the reply text, one ask=) only when it holds
+  a choice only they can make (two behaviours, a breaking change) or they
+  asked to see it; their answer goes to the child word for word.
+- **A developer's report**: the checks above. If it holds and the change
+  is more than a small fix (prompting, §2), start a reviewer before you
+  report (prompting, §7). A small fix that holds is reported.
+- **A researcher's answer**: every finding has a path:line and a
+  confirmation, or says "read, not run". Its Tree line (the last
+  `git status --short`) shows nothing it changed: "no file was changed"
+  needs that command, as a reviewer's does. If the answer feeds a change, the
+  developer's `text` gets the findings as they are.
+- **A reviewer's verdict**: `accept` with no blockers: report the change,
+  with the reviewer's Ran lines beside the developer's and its "should"
+  findings as notes. `send back`: send the blockers word for word to the
+  same developer (engine_start with its name and `text`), then review its
+  next report the same way, with the same reviewer. A blocker that comes
+  back twice, or a developer and a reviewer that disagree on the facts:
+  ask the person, with both sides.
+
+## Decide
+
+- **Accept**: every check holds. Report to the person: what was done, the
+  evidence (copy the commands and their last lines exactly), and what is
+  unverified.
+- **Send back**: name exactly what is missing or wrong, in one message to the
+  same child (engine_start with its name and `text`). Do not fix it
+  yourself in the report.
+- **Ask the person**: the result shows a choice only they can make (two
+  behaviours, a breaking change), or the same failure came back twice. Ask
+  one question with ask=.
+
+Never upgrade a result: "probably works" stays "not verified".
+
+Ideas from gstack's review lead-judgment rules, pstack's `interrogate`
+(a finding counts only if a rerun proves it), and Open SWE's plan review
+and reviewer loop, all MIT; written for dry.
+
+### assistant
+
+thought: The whole second reply holds against the done criteria. A command and its output show notes.md, summary.md (plus lessons.md) and 10 saved pages in sources/. Each of the three traits has its urls, all from saved sources. Open points are stated: the day conflict (21 Nov vs 1 Dec 1887) with both sources, the Gillette attribution resting on Wikipedia alone, and trait 1 sourced mainly from a study guide. The first reply already gave the creator, the first story, its year and venue, with urls. Nothing was committed. I accept it and tick its line. With every line ticked, my next step is the summarizing skill on its own.
+act: write(name="plan", text="## Plan\n- [x] research-holmes (deep-research): notes.md and summary.md in /Volumes/Backup/dry-build/night-run/smoke3/proj/holmes with the creator, the first story's title and year, and three speech traits, every fact with its url\n- [x] dev-tree (developer): tree.py in /Volumes/Backup/dry-build/night-run/smoke3/proj/tree; 'python3 tree.py 3' prints 3 centred lines of 1, 3, 5 stars; bad input exits 1 with a usage line")
+
+### tools
+
+write(name="plan", text="## Plan\n- [x] research-holmes (deep-research): notes.md and …") → saved plan (419 characters)
+
+### assistant
+
+thought: Both plan lines are ticked, so per my instructions the first step is to load the summarizing skill on its own; the summary will be my reply once its instructions are back.
+act: skill(name="summarizing")
+
+### tools
+
+skill(name="summarizing") → Skill `summarizing` loaded. Follow it:
+
+# Summarizing: the goal, as facts
+
+The summary is what the person reads instead of the whole thread. They
+want to know what happened and why, and to trust each line. So it holds
+facts only: what was asked, what was decided and on what evidence, what
+was made, what the numbers were, what failed, what is open.
+
+## Where the facts come from
+
+- **The plan artifact**: the deliverables and their marks.
+- **The children artifact**: each child's goal and its whole last reply
+  (the message that woke you shows only the start of it).
+- **This conversation**: the person's words, your briefs, what you sent
+  back and why, the order things happened in.
+
+You hold no files. A number you need that no reply shows (a score, a
+time, a count) is asked of the child that has it: engine_start with its
+name and a `text` that names the number and the file it is in. Wait for
+it, then summarise. Never fill a gap from what is likely.
+
+## The form
+
+Reply once, with these parts, in this order:
+
+```text
+Asked: the goal in the person's words, then in one line what done meant
+Direction: each decision, in the order it was taken, one line each:
+  <what was decided> — because <the evidence: a reply, a number, an error> — instead of <what was not done>
+Work: one block per child:
+  <child> (<template>, <model>): its goal in one line
+  Result: done / done in part / failed, in one line
+  Numbers: the ones its reply shows (counts, seconds, scores, exit codes), each with its unit
+  Files: the paths it reports
+Learned: what worked and what failed, one line each, with the run or reply that showed it
+Not done or not verified: each open plan line, each Unverified a child reported, each thing nobody checked
+Files: every path a child reported, grouped by folder
+```
+
+Keep it too: write(name="summary", text="<the same text>") in a step of
+its own, before the step that replies. A reply ends your turn.
+
+## Rules
+
+1. **Facts only.** No adjectives of praise or blame ("great", "robust",
+   "unfortunately"), no "successfully", no feelings, no advice unless
+   the person asked for it. "r2 scored 4.1 in voice against 2.3 for the
+   base (eval/r2.md)" is a fact; "the model captures his charm" is not.
+2. **Every number has an owner.** It comes from a child's reply or an
+   artifact, and the line says which. A number nobody showed is asked
+   for, or listed under Not verified as missing.
+3. **Nothing claimed that was not shown.** A child that said "tests
+   pass" with no command is reported as "says tests pass; no command
+   shown".
+4. **Direction is the part only you can write.** Each time the work
+   turned (a child sent back, a plan line added or dropped, a second
+   approach, a model changed), say what turned it. A goal that went
+   straight has a short Direction, and that is fine.
+5. **Failures are results.** A run that crashed, a site that refused, a
+   child that had to be replaced: each is a line under Work or Learned
+   with its error in its own words.
+6. **The person's words win.** Asked quotes them. If what was built
+   differs from what was asked, the first line of Not done says how.
+7. **Short lines, no nesting below the form.** A reader should find any
+   fact by its part. Under about 6000 characters; a table with show=
+   when the numbers of several children line up in the same columns.
+
+## Example lines
+
+```text
+Direction:
+  research before any build — because a persona's facts must have sources — instead of writing the card from memory
+  r2 with 400 examples instead of 200 — because r1 scored 3.1 in voice with valid loss still falling (runs.md row r1) — instead of more iterations
+Learned:
+  the DuckDuckGo search answered 14 of 14 queries; two sites refused with 403 (research-sparrow, lessons.md)
+  a 1.5B base trained in 212 s; the 4B base took 1140 s for +0.2 in voice (dev-sparrow rows r1, r3)
+Not done or not verified:
+  nobody talked to the tuned model outside the eval prompts
+```
+
+### assistant
+
+thought: Both plan lines are ticked and the summarizing skill is loaded. It says to save the summary as an artifact in its own step before the reply. I write it now from the plan, both children's whole replies and this conversation, and I reply with the same text next.
+act: write(name="summary", text="Asked: \"Two small things, both under the folder /Volumes/Backup/dry-build/night-run/smoke3/proj. Nobody will answer questions: decide yourself and say what you decided. (1) From the web: who created the character Sherlock Holmes, the title and year of the first story he appears in, and three traits of how he speaks. A short research with its sources, in the folder …/proj/holmes. (2) A Python script tree.py in the folder …/proj/tree that prints a centred tree of height n, each level 2 stars wider. The two do not need each other. When both are done, summarise.\"\nDone meant: a sourced research in proj/holmes (notes.md, summary.md, a url for every fact) and a tree.py in proj/tree whose runs show the expected output.\n\nDirection:\n- two children started at the same time — because the person said the two do not need each other — instead of one after the other\n- tree readings decided by me — because nobody would answer questions — n is the first command-line argument with a default of 5; level k has 2k-1 stars; lines are centred with leading spaces only; there is no trunk; n must be an integer >= 1, and bad input prints usage on stderr and exits 1\n- no reviewer for tree.py — because it is a small new script (one file) — instead of a review pass\n- research-holmes sent back once — because its first reply, as I could read it, was cut off partway through trait 1, with no file listing and no urls visible for traits 2 and 3 — instead of accepting it unseen; it restated them in a second reply\n\nWork:\nresearch-holmes (deep-research, model not set, so my own): a short sourced answer on Holmes's creator, his first story with its year, and three speech traits\n  Result: done\n  Answer: created by Arthur Conan Doyle; first appears in the novel A Study in Scarlet, published in 1887 in Beeton's Christmas Annual (Ward, Lock & Co.)\n  Traits:\n    (1) he explains his reasoning aloud, step by step, as a lesson — shmoop.com/study-guides/sherlock-holmes/writing-style.html; en.wikipedia.org/wiki/Sherlock_Holmes; arthur-conan-doyle.com/wiki/Sherlock_Holmes\n    (2) he states his method as maxims and calls his conclusions \"elementary\" — en.wikipedia.org/wiki/Sherlock_Holmes; arthur-conan-doyle.com/wiki/Sherlock_Holmes\n    (3) he uses dry irony toward Watson and addresses him as \"my dear Watson\" — arthur-conan-doyle.com/wiki/How_Watson_Learned_the_Trick; arthur-conan-doyle.com/wiki/Sherlock_Holmes; en.wikipedia.org/wiki/Sherlock_Holmes\n  Numbers: 10 pages saved in sources/; notes.md 6597 bytes, summary.md 5080 bytes, lessons.md 1496 bytes (ls -la . sources && wc -c, exit 0); 2 replies\n  Files: notes.md, summary.md, lessons.md, sources/ (10 .txt)\n\ndev-tree (developer, model not set, so my own): tree.py prints a centred tree of height n, each level 2 stars wider\n  Result: done\n  Numbers (developer's runs, from cat -e):\n    python3 tree.py 3: exit 0, `  *$` / ` ***$` / `*****$`\n    python3 tree.py 1: exit 0, `*$`\n    python3 tree.py: exit 0, 5 lines, the last is `*********$`\n    0, -2, abc, `3 1 2`: each exits 1, 0 bytes on stdout, `usage: python3 tree.py [n]  (n integer >= 1)` on stderr\n  Files: tree.py (new)\n\nLearned:\n- a child's long reply can reach me cut off; asking for a short restatement under 1500 characters got the missing parts in one round (research-holmes, reply 2)\n- the developer also rejects extra arguments as bad input; I had not specified that case (dev-tree reply)\n\nNot done or not verified:\n- day of first publication: 21 Nov 1887 (Doyle Encyclopedia) or 1 Dec 1887 (EBSCO); the year 1887 is the same in both\n- that Gillette's 1899 play originated \"Elementary, my dear Watson\" rests on Wikipedia alone, which calls it alleged\n- trait 1 is described most directly by a study guide (Shmoop)\n- tree.py at height 7 was run, but its output was cut off and not checked; there is no test file (dev-tree)\n- I hold no files: the file contents above are as the children reported them, not reread by me\n- nothing was committed, pushed or published\n\nFiles:\n/Volumes/Backup/dry-build/night-run/smoke3/proj/holmes: notes.md, summary.md, lessons.md, sources/ (10 pages)\n/Volumes/Backup/dry-build/night-run/smoke3/proj/tree: tree.py")
+
+### tools
+
+write(name="summary", text="Asked: "Two small things, both under the folder /Volumes/Bac…") → saved summary (4154 characters)
+
+### assistant
+
+thought: The summary is saved; now I reply with the same text, which ends the goal. A stat or table isn't needed; plain text is enough.
+act: reply(text="Asked: \"Two small things, both under the folder /Volumes/Backup/dry-build/night-run/smoke3/proj. Nobody will answer questions: decide yourself and say what you decided. (1) From the web: who created the character Sherlock Holmes, the title and year of the first story he appears in, and three traits of how he speaks. A short research with its sources, in the folder …/proj/holmes. (2) A Python script tree.py in the folder …/proj/tree that prints a centred tree of height n, each level 2 stars wider. The two do not need each other. When both are done, summarise.\"\nDone meant: a sourced research in proj/holmes (notes.md, summary.md, a url for every fact) and a tree.py in proj/tree whose runs show the expected output.\n\nDirection:\n- two children started at the same time — because the person said the two do not need each other — instead of one after the other\n- tree readings decided by me — because nobody would answer questions — n is the first command-line argument with a default of 5; level k has 2k-1 stars; lines are centred with leading spaces only; there is no trunk; n must be an integer >= 1, and bad input prints usage on stderr and exits 1\n- no reviewer for tree.py — because it is a small new script (one file) — instead of a review pass\n- research-holmes sent back once — because its first reply, as I could read it, was cut off partway through trait 1, with no file listing and no urls visible for traits 2 and 3 — instead of accepting it unseen; it restated them in a second reply\n\nWork:\nresearch-holmes (deep-research, model not set, so my own): a short sourced answer on Holmes's creator, his first story with its year, and three speech traits\n  Result: done\n  Answer: created by Arthur Conan Doyle; first appears in the novel A Study in Scarlet, published in 1887 in Beeton's Christmas Annual (Ward, Lock & Co.)\n  Traits:\n    (1) he explains his reasoning aloud, step by step, as a lesson — shmoop.com/study-guides/sherlock-holmes/writing-style.html; en.wikipedia.org/wiki/Sherlock_Holmes; arthur-conan-doyle.com/wiki/Sherlock_Holmes\n    (2) he states his method as maxims and calls his conclusions \"elementary\" — en.wikipedia.org/wiki/Sherlock_Holmes; arthur-conan-doyle.com/wiki/Sherlock_Holmes\n    (3) he uses dry irony toward Watson and addresses him as \"my dear Watson\" — arthur-conan-doyle.com/wiki/How_Watson_Learned_the_Trick; arthur-conan-doyle.com/wiki/Sherlock_Holmes; en.wikipedia.org/wiki/Sherlock_Holmes\n  Numbers: 10 pages saved in sources/; notes.md 6597 bytes, summary.md 5080 bytes, lessons.md 1496 bytes (ls -la . sources && wc -c, exit 0); 2 replies\n  Files: notes.md, summary.md, lessons.md, sources/ (10 .txt)\n\ndev-tree (developer, model not set, so my own): tree.py prints a centred tree of height n, each level 2 stars wider\n  Result: done\n  Numbers (developer's runs, from cat -e):\n    python3 tree.py 3: exit 0, `  *$` / ` ***$` / `*****$`\n    python3 tree.py 1: exit 0, `*$`\n    python3 tree.py: exit 0, 5 lines, the last is `*********$`\n    0, -2, abc, `3 1 2`: each exits 1, 0 bytes on stdout, `usage: python3 tree.py [n]  (n integer >= 1)` on stderr\n  Files: tree.py (new)\n\nLearned:\n- a child's long reply can reach me cut off; asking for a short restatement under 1500 characters got the missing parts in one round (research-holmes, reply 2)\n- the developer also rejects extra arguments as bad input; I had not specified that case (dev-tree reply)\n\nNot done or not verified:\n- day of first publication: 21 Nov 1887 (Doyle Encyclopedia) or 1 Dec 1887 (EBSCO); the year 1887 is the same in both\n- that Gillette's 1899 play originated \"Elementary, my dear Watson\" rests on Wikipedia alone, which calls it alleged\n- trait 1 is described most directly by a study guide (Shmoop)\n- tree.py at height 7 was run, but its output was cut off and not checked; there is no test file (dev-tree)\n- I hold no files: the file contents above are as the children reported them, not reread by me\n- nothing was committed, pushed or published\n\nFiles:\n/Volumes/Backup/dry-build/night-run/smoke3/proj/holmes: notes.md, summary.md, lessons.md, sources/ (10 pages)\n/Volumes/Backup/dry-build/night-run/smoke3/proj/tree: tree.py")
+
+### user
+
+engine research-holmes replied: "A Study in Scarlet, a novel, which is also Dr Watson's first appearance (https://en.wikipedia.org/wiki/A_Study_in_Scarlet; https://www.ebsco.com/research-starters/history/first-appearance-sherlock-holmes/)." (engines children)
+
+### assistant
+
+thought: research-holmes sent a third reply, which came in after the summary. It is one line restating that the first story is *A Study in Scarlet*, with two urls. Every child reply gets judged, so I load the judging skill on its own first. Then I'll check whether this reply adds anything to the summary, such as Watson's first appearance. I'll also check whether dev-tree's later "failed" status (an API safeguards error) changes anything, since its report was already in and accepted.
+act: skill(name="judging")
+
+### tools
+
+skill(name="judging") → Skill `judging` loaded. Follow it:
+
+# Judging a child's reply
+
+The child's report is a claim. Your job is to decide whether the claim
+holds, using only what it shows.
+
+**Read the whole reply.** The message that wakes you shows only its
+start. The whole reply is in the children artifact, under the child's
+`last reply`. Judge that, never the cut message.
+
+## Check, in order
+
+1. **Every done check has evidence.** For each line of the `done` you
+   wrote, find the evidence in the reply: a command with its exit code and
+   last line, a file:line, what the page showed. "Tests pass" with no command
+   and no output is not evidence, and neither is a fact with no command
+   behind it ("the folder is not a git repo": which command showed that?).
+2. **The evidence fits the claim.** A build that passed does not prove a
+   behaviour. A test that passes but does not exercise the change proves
+   nothing about it. A screenshot path with no text from the page is not
+   something you can read.
+3. **Scope held.** "Also changed" lists only what is needed. A file that
+   was not in the plan needs a reason.
+4. **The unverified part is said.** Something that could not be checked
+   (no browser here, no evidence.md in the project) is fine if the reply
+   says so. Silence about it is not.
+5. **It answers the person's ask**, not only your brief. If your brief was
+   wrong, say so to the person.
+
+## By kind of reply
+
+- **A plan** (a developer whose scope said "plan first"): check the steps
+  cover every done line, each step names a file, the proof would fail on
+  today's code, and out of scope matches yours. Approve it with a message
+  to the same child: "Plan approved: code it." Send it back with what is
+  missing. Ask the person (the plan in the reply text, one ask=) only when it holds
+  a choice only they can make (two behaviours, a breaking change) or they
+  asked to see it; their answer goes to the child word for word.
+- **A developer's report**: the checks above. If it holds and the change
+  is more than a small fix (prompting, §2), start a reviewer before you
+  report (prompting, §7). A small fix that holds is reported.
+- **A researcher's answer**: every finding has a path:line and a
+  confirmation, or says "read, not run". Its Tree line (the last
+  `git status --short`) shows nothing it changed: "no file was changed"
+  needs that command, as a reviewer's does. If the answer feeds a change, the
+  developer's `text` gets the findings as they are.
+- **A reviewer's verdict**: `accept` with no blockers: report the change,
+  with the reviewer's Ran lines beside the developer's and its "should"
+  findings as notes. `send back`: send the blockers word for word to the
+  same developer (engine_start with its name and `text`), then review its
+  next report the same way, with the same reviewer. A blocker that comes
+  back twice, or a developer and a reviewer that disagree on the facts:
+  ask the person, with both sides.
+
+## Decide
+
+- **Accept**: every check holds. Report to the person: what was done, the
+  evidence (copy the commands and their last lines exactly), and what is
+  unverified.
+- **Send back**: name exactly what is missing or wrong, in one message to the
+  same child (engine_start with its name and `text`). Do not fix it
+  yourself in the report.
+- **Ask the person**: the result shows a choice only they can make (two
+  behaviours, a breaking change), or the same failure came back twice. Ask
+  one question with ask=.
+
+Never upgrade a result: "probably works" stays "not verified".
+
+Ideas from gstack's review lead-judgment rules, pstack's `interrogate`
+(a finding counts only if a rerun proves it), and Open SWE's plan review
+and reviewer loop, all MIT; written for dry.
+
+### assistant
+
+thought: research-holmes's third reply restates that the first story is *A Study in Scarlet*, a novel, with two urls (Wikipedia, EBSCO). It adds one fact: it is also Dr Watson's first appearance. That fits the summary I already gave and changes no plan line. The children artifact also shows dev-tree as "failed" with an API safeguards error. That status came after its report, which I had already judged and accepted, so tree.py's result stands. I can't confirm that the failure touched no file, so I'll say so. I'll reply with a short addendum rather than resend the whole summary.
+
+act: reply(text="An addendum to the summary above. Both plan lines stay ticked.\n\n- **research-holmes, third reply:** *A Study in Scarlet* (a novel) is also Dr Watson's first appearance. Sources: https://en.wikipedia.org/wiki/A_Study_in_Scarlet and https://www.ebsco.com/research-starters/history/first-appearance-sherlock-holmes/. This agrees with the answer already given and adds that one fact.\n- **dev-tree status:** after its report, the children artifact shows it as failed: \"API Error: Sonnet 5.5's safeguards flagged this message\". Its report on tree.py came in before that and was already judged against the brief, so the tree.py result above stands. I have not seen whether that failed turn did anything to the folder; nobody has reread tree.py since.\n\nNothing was committed, pushed or published.", show="list", data="research-holmes: done, checked (3 replies)|dev-tree: done, checked; later turn failed (API safeguards error)")
+

@@ -83,10 +83,12 @@ Here is one loop traced through today's code:
 
 ### Gap 2: Triggers. Alerts are designed but never fire, and events skip the thread
 
-- `alert.rs` parses `at`/`every` and decides `due`, but "Firing … is not
-  built yet" (`alert.rs:29-31`). The alerts artifact has no tools
-  (`live.rs:134`), so only the person can make one, by writing
-  `spec/alerts/*.md`.
+- **Closed in part, 2026-11-23:** alerts fire. `alert::settle` is looked
+  at in `turn::callbacks` with the other callbacks, and the alerts
+  artifact brings `alert(name, trigger, text, once?)`, so an engine sets
+  its own next look (docs/engine-standard.md, `kind: alerts`;
+  docs/loop/journal.md §14). Open: `watch` triggers, and a fired alert
+  wakes by `add_text`, not by a post on the thread.
 - Capability events wake engines by `add_text` straight into their
   history (`host.rs:315-337`), not by a post on the thread. That breaks
   "an engine is only called when its thread has a guided message"
@@ -264,7 +266,7 @@ All of these were checked in code or tests:
 | Child reply (`engine_call`) | `engines::settle` resume | yes (`waiting:`) |
 | Terminal `start` ends | `terminal::settle_engine` (`.exit` file) | yes; died with the app → `stopped` |
 | Capability event (`## event:` `when:`) | `Host::deliver_events` → `add_text` into every user's history (`host.rs:315-337`) | edge state in memory only (*unverified* whether the first reading after a restart re-baselines; the rule "first reading never fires" suggests it does, so an edge that happened while the host was down is lost) |
-| Alert (`at`, `every`) | **not fired**; `due()` is never called (`alert.rs:29-31`) | spec files only |
+| Alert (`at`, `every`) | fired on the callbacks tick (`alert::settle`, 2026-11-23); made by the person's file or the engine's `alert` tool | the marks (first seen, last fired) in `convo/run.md`; a moment missed while no shell ran is not fired late |
 | `spans::Trigger::Schedule` | defined for analytics, never produced (docs/analytics.md:121) | — |
 
 ### Design: alerts and watchers as elements that post to a thread

@@ -25,18 +25,22 @@ dist/
 | Home's dashboard, Desk, an engine's page, artifact pages, Settings, UI tokens, Code | the shared renderer (`crates/html`) |
 | The scene (an app setting) | painted on a `<canvas>` from `dry_core::scene` (the window's scene; the server's pages use scene.js) |
 | State across reloads | IndexedDB (database `dry`, store `texts`) |
+| `file` and `terminal` artifacts | the page's own Linux (Alpine in v86, `dry_web::env`, docs/container.md): the workspace is `/work`; a paired companion's folder instead when one is joined. Python is installed by the engine when it needs it (`apk add python3`, from the packages served beside the app) |
+| The live view (`#/desk/<n>/live`) | the engine's files, the file it touched last in front, its commands and their output, an HTML file drawn as a page above its code (docs/developer-loop.md §2b) |
 
 | Refused | Why, as the page says it |
 |---|---|
-| `file` artifacts (open, read, write files) | "no files in the browser: a file artifact reads and writes a folder on a computer" |
-| `terminal` artifacts (`run`, `start`, `background`) | "no terminal in the browser: commands run on a computer" |
 | MCP tools | none are started: they are programs; a call to one gets the built-ins' "no such tool" |
 | Session engines (`claude`, `codex` …) | "a … session runs its program on a computer; open this engine in the desktop app" |
 | Editing routes, themes, tokens; the Code page's terminal | drawn off with "not in the browser: this needs the desktop app" |
 
-A Linux to run commands in is on its own route, `#/container`: Alpine in
-v86, with exec, a port's page and saved machines (docs/container.md). It
-is not wired to `terminal` artifacts yet.
+The same Linux is on its own route too, `#/container`: exec by hand, a
+port's page and saved machines (docs/container.md).
+
+Proved on 2026-11-23 with a local model (docs/loop/journal.md): from one
+sentence on the Desk, the translator briefed a developer, which installed
+python in the page, wrote `tree.py`, ran it and reported; nothing but the
+model calls left the page.
 
 The Code page browses the app's own bundled files (routes, components,
 themes, scenes, `responses.md`, `models.json`, `sessions.json`), read-only.
@@ -120,10 +124,31 @@ python3 -m http.server 8765 --bind 127.0.0.1 --directory /tmp/site
 While working on the app alone, `cd crates/web && trunk serve --port 8765`
 rebuilds on save (then the app is at `/`).
 
+## The model server
+
+On a first visit (no model chosen) the page looks for a model server on
+this computer by itself: LM Studio (`localhost:1234`), oMLX
+(`localhost:8873`) and Ollama (`localhost:11434`), each one's default port
+(`settings::LOCAL_SERVERS`). It takes the one that has a model that chats
+**loaded** (`served::first_server`), else the first that lists one, never
+an embeddings model; Home's Model server card says which. Each server must
+allow the page's origin (CORS). The window a model takes is read from LM
+Studio (`/api/v0/models`), Ollama (`/api/show`) or the list itself
+(`max_model_len`: oMLX, vLLM); 8,192 is assumed only when none says.
+
+A model that writes its calls its own way (`tool_calls` in the answer, as
+oMLX gives them for Inkling) is read the same as one that writes `act:`
+(`inference::chat_text`).
+
 ## LM Studio
 
 1. Load a model in LM Studio's **Developer** tab and start the server
-   (port 1234).
+   (port 1234). Load it with a window that holds the prompt: LM Studio's
+   default can be 4,096 tokens, and the translator's first prompt is about
+   2,600 (`lms load <model> -c 32768`). A model of the Inkling-2 family
+   loads only with LM Studio's `omlx` runtime (`lms runtime select
+   omlx-mac-arm64-apple-metal-advsimd@0.6.0`); with `mlx-llm` it fails
+   with "Model type inkling2_loop not supported" (2026-11-23).
 2. In the server's **Settings**, turn on **Enable CORS**. Check it:
 
    ```sh
@@ -245,6 +270,7 @@ the repo's name).
 - Option 3, a client for a remote host: the `TextStore` and `Transport`
   over HTTP above, the host's write endpoints (docs/web.md), and a mobile
   shell on the same page.
-- Files for `file` artifacts in the browser (an OPFS-backed `Host`).
-- Streaming replies (the reply arrives whole; the tint says the call is out).
+- A returning visitor may run an older build for a while: the app's files
+  keep their names (`--filehash false`), so the browser's cache decides.
+- Git in the page's Linux (no package for it beside the app).
 - Voice.

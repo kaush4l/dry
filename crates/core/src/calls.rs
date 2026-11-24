@@ -24,6 +24,16 @@ impl Call {
     }
 }
 
+impl Call {
+    /// Written back in the grammar in full: every value quoted, nothing
+    /// cut, so `parse` reads the same call again (`Display` cuts long
+    /// values for a result line).
+    pub fn written(&self) -> String {
+        let args: Vec<String> = self.args.iter().map(|(k, v)| format!("{k}=\"{}\"", v.replace('\\', "\\\\").replace('"', "\\\""))).collect();
+        format!("{}({})", self.name, args.join(", "))
+    }
+}
+
 impl fmt::Display for Call {
     /// Written back in the grammar, values quoted, long ones cut.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -115,6 +125,14 @@ mod tests {
         assert_eq!(calls[1].arg("name"), Some("plan"));
         assert_eq!(calls[2].to_string(), "reply(text=\"hi\")");
         assert_eq!(parse("list()").unwrap()[0].args, vec![]);
+    }
+
+    #[test]
+    fn a_call_written_in_full_reads_back_the_same() {
+        let code = "import sys\nprint(\"a\\tb\", 'c')  # 100%\n";
+        let call = Call { name: "edit".into(), args: vec![("path".into(), "src/tree.py".into()), ("new".into(), code.into())] };
+        assert_eq!(parse(&call.written()).unwrap(), vec![call.clone()], "{}", call.written());
+        assert!(call.to_string().len() < call.written().len() + 2, "Display may cut; written never does");
     }
 
     #[test]

@@ -342,6 +342,9 @@ pub enum Server {
     /// `POST {root}/api/show {"model": ...}`: `num_ctx` in `parameters`,
     /// else `model_info.<arch>.context_length`.
     Ollama,
+    /// `GET {base}/models`, the list every OpenAI-format server has: a
+    /// model's `max_model_len` where the server gives one (vLLM, oMLX).
+    Listed,
 }
 
 /// One request that may say the window.
@@ -379,6 +382,9 @@ pub fn probes(ai: &OpenAi) -> Vec<Probe> {
             body: Some(json!({ "model": ai.model }).to_string()),
             key_env: ai.key_env.clone(),
         },
+        // Last: only some servers put a length in the list, and the two
+        // above say what the model is loaded with, which is the real limit.
+        Probe { server: Server::Listed, url: format!("{base}/models"), body: None, key_env: ai.key_env.clone() },
     ]
 }
 
@@ -396,6 +402,10 @@ pub fn read_probe(server: Server, body: &str, model: &str) -> Option<(u32, Strin
                 }
             }
             None
+        }
+        Server::Listed => {
+            let m = v.get("data")?.as_array()?.iter().find(|m| m.get("id").and_then(Value::as_str) == Some(model))?;
+            m.get("max_model_len").and_then(num).map(|n| (n, "the server's max_model_len".into()))
         }
         Server::Ollama => {
             let set = v.get("parameters").and_then(Value::as_str).and_then(|p| {
@@ -465,6 +475,11 @@ mod tests {
         assert_eq!(read_probe(Server::Ollama, ol, "x"), Some((16_384, "Ollama num_ctx".into())));
         assert_eq!(read_probe(Server::Ollama, r#"{"model_info":{"qwen3.context_length":40960}}"#, "x").unwrap().0, 40_960);
         assert_eq!(read_probe(Server::Ollama, "<html>404</html>", "x"), None);
+        // As oMLX and vLLM list a model; a server that gives no length says nothing.
+        let listed = r#"{"object":"list","data":[{"id":"Inkling-2-Mini-oQ4e-mtp","owned_by":"omlx","model_type":"vlm","max_model_len":1048576},{"id":"MarkItDown","max_model_len":null}]}"#;
+        assert_eq!(read_probe(Server::Listed, listed, "Inkling-2-Mini-oQ4e-mtp"), Some((1_048_576, "the server's max_model_len".into())));
+        assert_eq!(read_probe(Server::Listed, listed, "MarkItDown"), None);
+        assert_eq!(read_probe(Server::Listed, r#"{"data":[{"id":"gpt"}]}"#, "gpt"), None);
 
         let from_server = Window::of(&ai, Some((4096, "LM Studio loaded_context_length".into())));
         assert_eq!(from_server.label(), "4.1k (server: LM Studio loaded_context_length)");

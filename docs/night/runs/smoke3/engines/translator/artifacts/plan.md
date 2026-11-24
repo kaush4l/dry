@@ -1,0 +1,3 @@
+## Plan
+- [x] research-holmes (deep-research): notes.md and summary.md in /Volumes/Backup/dry-build/night-run/smoke3/proj/holmes with the creator, the first story's title and year, and three speech traits, every fact with its url
+- [x] dev-tree (developer): tree.py in /Volumes/Backup/dry-build/night-run/smoke3/proj/tree; 'python3 tree.py 3' prints 3 centred lines of 1, 3, 5 stars; bad input exits 1 with a usage line

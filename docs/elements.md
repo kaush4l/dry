@@ -466,7 +466,10 @@ Maven (docs/container.md, "Networking").
    element over models.json and sessions.json, with probes and the
    analytics usage; `model=` on `engine_start` (a session row makes a
    session engine). Settings Models and Sessions drawn from it: not yet.
-3. **Runtime packs** in the VM: python (works), node, then java and rust
+3. **Runtime packs** in the VM (first part built 2026-11-23:
+   `environment::VM_PACKS`; the environment line names what can be added
+   and with which command, and a developer made from the template holds
+   that line): python (works), node, then java and rust
    measured for real (guest memory raised if needed), each pack's numbers
    in docs/container.md. bun stays host-only.
 4. **`machines`**: this machine's row, then peers from the handshake;

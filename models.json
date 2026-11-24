@@ -9,8 +9,13 @@
   "models": [
     {
       "name": "local",
-      "id": "openai/c/ripple-65b-abliterated",
+      "id": "openai/c/inkling-2-mini-oq4e-mtp",
       "base_url": "http://127.0.0.1:1234/v1"
+    },
+    {
+      "name": "omlx",
+      "id": "openai/c/Inkling-2-Mini-oQ4e-mtp",
+      "base_url": "http://127.0.0.1:8873/v1"
     },
     {
       "name": "gpt",
@@ -21,6 +26,18 @@
       "kind": "cli",
       "provider": "claude",
       "model": "haiku"
+    },
+    {
+      "name": "claude/sonnet",
+      "kind": "cli",
+      "provider": "claude",
+      "model": "sonnet"
+    },
+    {
+      "name": "claude/opus",
+      "kind": "cli",
+      "provider": "claude",
+      "model": "opus"
     },
     {
       "name": "codex/luna",

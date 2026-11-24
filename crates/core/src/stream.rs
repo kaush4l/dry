@@ -88,6 +88,11 @@ pub struct Sse {
     raw: Vec<u8>,
     events: usize,
     text: String,
+    /// The reasoning streamed apart from the text, kept for an answer
+    /// whose calls came as `tool_calls` (`crate::inference`).
+    think: String,
+    /// `delta.tool_calls`, by their index: name and arguments so far.
+    calls: Vec<(String, String)>,
     error: Option<String>,
     completed: Option<String>,
     done: bool,
@@ -145,7 +150,20 @@ impl Sse {
             out.push(Delta::Text(t));
         }
         if let Some(t) = s("/choices/0/delta/reasoning_content").or_else(|| s("/choices/0/delta/reasoning")) {
+            self.think.push_str(&t);
             out.push(Delta::Think(t));
+        }
+        // Calls the model wrote its own way come in pieces: a name once,
+        // then its arguments' JSON a few characters at a time.
+        for c in v.pointer("/choices/0/delta/tool_calls").and_then(serde_json::Value::as_array).into_iter().flatten() {
+            let i = c.get("index").and_then(serde_json::Value::as_u64).map_or(self.calls.len().saturating_sub(1), |i| i as usize);
+            if i >= self.calls.len() && i < 64 {
+                self.calls.resize(i + 1, Default::default());
+            }
+            let Some((name, args)) = self.calls.get_mut(i) else { continue };
+            let f = |key: &str| c.pointer(&format!("/function/{key}")).and_then(serde_json::Value::as_str);
+            name.push_str(f("name").unwrap_or(""));
+            args.push_str(f("arguments").unwrap_or(""));
         }
         match v.get("type").and_then(serde_json::Value::as_str) {
             Some("response.output_text.delta") => {
@@ -178,7 +196,13 @@ impl Sse {
         if self.responses {
             return self.completed.unwrap_or_else(|| serde_json::json!({ "output_text": self.text }).to_string());
         }
-        serde_json::json!({ "choices": [{ "message": { "role": "assistant", "content": self.text } }] }).to_string()
+        let mut message = serde_json::json!({ "role": "assistant", "content": self.text });
+        // As a plain body carries them, so `Inference::reply` reads both the same way.
+        if self.calls.iter().any(|(name, _)| !name.is_empty()) {
+            message["reasoning_content"] = self.think.into();
+            message["tool_calls"] = self.calls.iter().map(|(name, args)| serde_json::json!({ "type": "function", "function": { "name": name, "arguments": args } })).collect();
+        }
+        serde_json::json!({ "choices": [{ "message": message }] }).to_string()
     }
 }
 
@@ -1582,6 +1606,13 @@ mod tests {
         let mut sse = Sse::new(&req);
         sse.push(b"data: {\"error\":{\"message\":\"context full\"}}\n\n");
         assert!(matches!(OpenAi::default().reply(&sse.finish()), Err(crate::inference::InferenceError::Api(m)) if m == "context full"));
+        // Calls streamed the model's own way (`delta.tool_calls`, in pieces): read as the act, the reasoning before them.
+        let mut sse = Sse::new(&req);
+        sse.push(b"data: {\"choices\":[{\"delta\":{\"reasoning_content\":\"Run it.\"}}]}\n\n");
+        sse.push(b"data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"c1\",\"function\":{\"name\":\"run\",\"arguments\":\"\"}}]}}]}\n\n");
+        sse.push(b"data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"{\\\"command\\\":\"}}]}}]}\n\n");
+        sse.push(b"data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\\\"ls -la\\\"}\"}},{\"index\":1,\"function\":{\"name\":\"list\",\"arguments\":\"{}\"}}]}}]}\n\ndata: [DONE]\n\n");
+        assert_eq!(OpenAi::default().reply(&sse.finish()), Ok("Run it.\nact: run(command=\"ls -la\"); list()".into()));
         // The Responses API.
         let req = Request { url: "http://x/v1/responses".into(), ..req };
         let mut sse = Sse::new(&req);

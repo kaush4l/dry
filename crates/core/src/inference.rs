@@ -156,7 +156,7 @@ impl Inference for OpenAi {
             return Err(InferenceError::Api(message.to_string()));
         }
         let text = match self.api {
-            Api::ChatCompletions => v.pointer("/choices/0/message/content").and_then(Value::as_str).map(str::to_string),
+            Api::ChatCompletions => v.pointer("/choices/0/message").and_then(chat_text),
             Api::Responses => responses_text(&v),
         };
         text.ok_or(InferenceError::NoText)
@@ -165,6 +165,53 @@ impl Inference for OpenAi {
     fn describe(&self) -> String {
         format!("{} · {} @ {}", self.api.as_str(), self.model, self.base_url)
     }
+}
+
+/// A chat message's text. Usually its `content`.
+///
+/// A model trained to call tools its own way may answer with `tool_calls`
+/// and little or no content, even though dry sends no `tools` (the calls
+/// are text in `act`): a server with a parser for that model moves them
+/// out of the text. They are the same calls, so they are written back as
+/// the answer's `act` line in the call grammar, after the content. When
+/// there is no content at all, what the model reasoned
+/// (`reasoning_content`) stands before it, so the thought is not lost.
+/// Without `tool_calls` the content is the text, as it came.
+fn chat_text(message: &Value) -> Option<String> {
+    let content = message.get("content").and_then(Value::as_str);
+    let calls = native_calls(message);
+    if calls.is_empty() {
+        return content.map(str::to_string);
+    }
+    let act = calls.iter().map(crate::calls::Call::written).collect::<Vec<_>>().join("; ");
+    let said = content.filter(|c| !c.trim().is_empty()).or_else(|| ["reasoning_content", "reasoning"].iter().find_map(|k| message.get(*k).and_then(Value::as_str)));
+    Some(match said.map(str::trim).filter(|s| !s.is_empty()) {
+        Some(said) => format!("{said}\n{}: {act}", crate::turn::ACT),
+        None => format!("{}: {act}", crate::turn::ACT),
+    })
+}
+
+/// The `tool_calls` of a chat message as calls: each function's name, and
+/// its arguments (a JSON object, or one written as a string) as the
+/// call's values (a call's arguments are read by name, so their order
+/// says nothing). A string value is taken as it is; any other as its JSON.
+pub fn native_calls(message: &Value) -> Vec<crate::calls::Call> {
+    let Some(list) = message.get("tool_calls").and_then(Value::as_array) else { return Vec::new() };
+    list.iter()
+        .filter_map(|c| {
+            let f = c.get("function").unwrap_or(c);
+            let name = f.get("name").and_then(Value::as_str).filter(|n| !n.is_empty())?.to_string();
+            let args = match f.get("arguments") {
+                Some(Value::String(text)) => serde_json::from_str::<Value>(text).unwrap_or(Value::Null),
+                Some(v) => v.clone(),
+                None => Value::Null,
+            };
+            let args = args.as_object().map_or(Vec::new(), |o| {
+                o.iter().map(|(k, v)| (k.clone(), v.as_str().map_or_else(|| v.to_string(), str::to_string))).collect()
+            });
+            Some(crate::calls::Call { name, args })
+        })
+        .collect()
 }
 
 /// The model ids a server offers, from its `GET {base}/models` body
@@ -253,6 +300,31 @@ mod tests {
     fn a_model_list_gives_its_ids() {
         let body = r#"{"object":"list","data":[{"id":"qwen3-8b","object":"model"},{"id":"nomic-embed"}]}"#;
         assert_eq!(parse_model_ids(body), Ok(vec!["qwen3-8b".to_string(), "nomic-embed".to_string()]));
+    }
+
+    #[test]
+    fn calls_a_model_wrote_its_own_way_are_read_as_the_act() {
+        let ai = OpenAi::default();
+        // As oMLX answered for Inkling (finish_reason tool_calls): no content, the thought in the reasoning.
+        let body = r#"{"choices":[{"finish_reason":"tool_calls","message":{"role":"assistant","content":"","reasoning_content":"The folder is empty. Write the file, then run it.\n","tool_calls":[
+            {"id":"call_1","type":"function","function":{"name":"edit","arguments":"{\"path\":\"tree.py\",\"new\":\"print(\\\"*\\\")\\n\"}"}},
+            {"id":"call_2","type":"function","function":{"name":"run","arguments":{"command":"python3 tree.py 3","timeout":5}}}]}}]}"#;
+        let text = ai.reply(body).unwrap();
+        // The reasoning stands as the thought; the calls follow as the act, in the call grammar.
+        // (Their arguments come in the order the JSON reader keeps, which depends on how it is built.)
+        let (thought, act) = text.split_once("\nact: ").unwrap();
+        assert_eq!(thought, "The folder is empty. Write the file, then run it.");
+        let calls = crate::calls::parse(act).unwrap();
+        assert_eq!(calls.iter().map(|c| c.name.as_str()).collect::<Vec<_>>(), ["edit", "run"]);
+        assert_eq!((calls[0].arg("path"), calls[0].arg("new")), (Some("tree.py"), Some("print(\"*\")\n")), "the file's text, quotes and all");
+        assert_eq!((calls[1].arg("command"), calls[1].arg("timeout")), (Some("python3 tree.py 3"), Some("5")), "a value that is not a string, as its JSON");
+        // Content beside the calls is kept before them; none at all leaves the act alone.
+        let both = r#"{"choices":[{"message":{"content":"thought: answer now","tool_calls":[{"function":{"name":"reply","arguments":"{\"text\":\"Done.\"}"}}]}}]}"#;
+        assert_eq!(ai.reply(both).unwrap(), "thought: answer now\nact: reply(text=\"Done.\")");
+        let bare = r#"{"choices":[{"message":{"content":null,"tool_calls":[{"function":{"name":"list","arguments":"{}"}}]}}]}"#;
+        assert_eq!(ai.reply(bare).unwrap(), "act: list()");
+        // No tool_calls: the content as it came.
+        assert_eq!(ai.reply(r#"{"choices":[{"message":{"content":"hi","tool_calls":[]}}]}"#).unwrap(), "hi");
     }
 
     #[test]

@@ -81,7 +81,7 @@ pub fn state(ai: &OpenAi, today: i64) -> State {
         msg(Role::Assistant, &reply("I read the changelog.", summary, None)),
     ];
     let e = &mut state.engines[release];
-    e.artifacts.insert("helpers".into(), to_text(&[Line { id: child_id.clone(), call: true, seen: 1 }]));
+    e.artifacts.insert("helpers".into(), to_text(&[Line { id: child_id.clone(), call: true, seen: 1, told: false }]));
     e.artifacts.insert("notes".into(), format!("## Next version\n\n{summary}\n"));
     e.messages = vec![
         msg(Role::User, "Draft the release notes and ask me when it ships."),

@@ -1,0 +1,1 @@
+Write a python script to print a tree of height n where each level has 2 more '*'. Make it center aligned. Work in the folder <proj>.

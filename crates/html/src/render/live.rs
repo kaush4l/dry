@@ -116,7 +116,8 @@ fn editor(out: &mut String, v: &LiveView, engine: &str) {
     for t in &v.tabs {
         let _ = write!(
             out,
-            "<span class=\"lv-tab\" title=\"{}\">{}{}</span>",
+            "<span class=\"lv-tab{}\" title=\"{}\">{}{}</span>",
+            if std::ptr::eq(t, &v.tabs[0]) { " now" } else { "" },
             esc(&t.path),
             esc(&t.name),
             if t.unsaved > 0 { " ●" } else { "" }
@@ -124,7 +125,12 @@ fn editor(out: &mut String, v: &LiveView, engine: &str) {
     }
     out.push_str("</div>");
     for (n, t) in v.tabs.iter().enumerate() {
-        let key = format!("{engine}/live/{}", t.key());
+        // The first tab is the file the engine touched last, open by
+        // default. Its key says so: when the engine moves to another file
+        // both keys change, so the page's kept folds (`data-key`) do not
+        // hold the view on the old file, and a person's own choice stays
+        // only while the engine stays.
+        let key = format!("{engine}/live/{}{}", if n == 0 { "now:" } else { "" }, t.key());
         let focus = t.focus.map(|(a, b)| format!(" · lines {a}–{b}")).unwrap_or_default();
         let _ = write!(
             out,
@@ -139,6 +145,8 @@ fn editor(out: &mut String, v: &LiveView, engine: &str) {
         if let Some(why) = &t.note {
             out.push_str(&note(why));
         }
+        // A page is looked at first, read second: its preview stands above its code.
+        preview(out, t);
         out.push_str("<pre class=\"lv-code\">");
         for l in &t.lines {
             let class = match (l.changed, l.focused) {
@@ -151,6 +159,32 @@ fn editor(out: &mut String, v: &LiveView, engine: &str) {
         out.push_str("</pre></details>");
     }
 }
+
+/// The page an HTML file makes, above its code: what a person following
+/// the work wants to see of a small UI element, without a server. It is
+/// drawn in a frame that can run the page's own script and nothing else:
+/// no access to this page (`sandbox` without same-origin) and no network
+/// (the policy line put before the file's text), since the text was
+/// written by a model. Only for a whole file (no focus) that holds text.
+fn preview(out: &mut String, t: &dry_core::liveview::Tab) {
+    let html = t.path.ends_with(".html") || t.path.ends_with(".htm");
+    if !html || t.focus.is_some() || t.lines.is_empty() {
+        return;
+    }
+    let text: String = t.lines.iter().map(|l| l.text.as_str()).collect::<Vec<_>>().join("\n");
+    let page = format!("<meta http-equiv=\"Content-Security-Policy\" content=\"{PREVIEW_POLICY}\">{text}");
+    let _ = write!(
+        out,
+        "<div class=\"lv-preview\"><div class=\"lv-sub\">PREVIEW<span class=\"note\">{} as a page · its own script runs, nothing is fetched</span></div><iframe title=\"preview of {}\" sandbox=\"allow-scripts\" srcdoc=\"{}\"></iframe></div>",
+        esc(&t.name),
+        esc(&t.path),
+        esc(&page)
+    );
+}
+
+/// What a previewed page may load: only what is written in the file
+/// itself (inline style and script, data: images). Nothing from a network.
+pub const PREVIEW_POLICY: &str = "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:";
 
 fn panel(out: &mut String, v: &LiveView, engine: &str) {
     let running = v.sessions.iter().filter(|s| s.view.running).count();
@@ -166,7 +200,9 @@ fn panel(out: &mut String, v: &LiveView, engine: &str) {
     // Each session a terminal (`term`): the newest output in view, and a
     // fold so a person can close the ones they are not watching.
     for (n, s) in v.sessions.iter().enumerate() {
-        let key = format!("{engine}/live/{}", s.key());
+        // As the editor's first tab: the first session is the one running
+        // or the newest, and its key follows it.
+        let key = format!("{engine}/live/{}{}", if n == 0 { "now:" } else { "" }, s.key());
         let (class, _, _) = super::term::state(&s.view);
         let _ = write!(
             out,
@@ -206,4 +242,33 @@ fn status(out: &mut String, v: &LiveView, i: usize, cx: &Ctx) {
 fn clock(unix: i64, offset: i32) -> String {
     let t = (unix + offset as i64).rem_euclid(86_400);
     format!("{:02}:{:02}:{:02}", t / 3600, t % 3600 / 60, t % 60)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use dry_core::inspect::FileLine;
+    use dry_core::liveview::Tab;
+
+    fn tab(path: &str, text: &str, focus: Option<(usize, usize)>) -> Tab {
+        let lines = text.lines().enumerate().map(|(i, l)| FileLine { n: i + 1, text: l.to_string(), changed: false, focused: true }).collect();
+        Tab { artifact: "code".into(), path: path.into(), name: path.into(), language: "HTML", focus, unsaved: 0, lines, note: None }
+    }
+
+    #[test]
+    fn an_html_file_is_previewed_in_a_frame_with_no_network_and_no_way_into_the_page() {
+        let mut out = String::new();
+        preview(&mut out, &tab("ui/counter.html", "<button onclick=\"n++\">Count \"it\"</button>\n<script>let n = 0</script>", None));
+        assert!(out.contains("<iframe title=\"preview of ui/counter.html\" sandbox=\"allow-scripts\" srcdoc=\""), "{out}");
+        assert!(!out.contains("allow-same-origin") && !out.contains("allow-top-navigation"), "its script cannot reach this page");
+        // The policy stands before the file's text, and the text is an attribute's value, never markup of this page.
+        assert!(out.contains("srcdoc=\"&lt;meta http-equiv=&quot;Content-Security-Policy&quot; content=&quot;default-src &#39;none&#39;;"), "{out}");
+        assert!(out.contains("&lt;button onclick=&quot;n++&quot;&gt;Count &quot;it&quot;&lt;/button&gt;") && !out.contains("<button"), "{out}");
+        // Nothing for a file that is not a page, one shown in part, or an empty one.
+        for t in [tab("tree.py", "print(1)", None), tab("a.html", "<p>x</p>", Some((1, 1))), tab("b.html", "", None)] {
+            let mut none = String::new();
+            preview(&mut none, &t);
+            assert_eq!(none, "", "{}", t.path);
+        }
+    }
 }

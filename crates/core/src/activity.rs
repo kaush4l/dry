@@ -275,6 +275,7 @@ mod tests {
             ("terminal", include_str!("../../../themes/terminal.md")),
             ("cat", include_str!("../../../themes/cat.md")),
             ("abyss", include_str!("../../../themes/abyss.md")),
+            ("bolt", include_str!("../../../themes/bolt.md")),
         ] {
             let theme = Theme::from_md(text).unwrap();
             for mode in [Mode::Light, Mode::Dark] {

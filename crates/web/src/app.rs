@@ -130,7 +130,7 @@ async fn boot() {
     let files = bundle::files();
     let mut world = World::from_files(&files, state, "", settings.theme.as_deref());
     world.host = Box::new(crate::companion::shell());
-    world.clock = Browser.clock();
+    world.clock = dry_core::live::Time::clock(&Browser);
     world.repo = Box::new(MemoryRepo(files));
     world.repo_name = "dry (bundled files)".into();
     world.access = Access::Live;
@@ -162,6 +162,10 @@ async fn boot() {
     // The environment: the VM boots (or comes back from IndexedDB) behind the page.
     crate::env::init();
     render();
+    // No model chosen yet (a first visit): look for a model server.
+    if with(|a| a.settings.model.is_empty()).unwrap_or(false) {
+        spawn_local(find_model_server());
+    }
     // The callbacks' tick, as the window's: children that replied.
     let tick = Closure::<dyn FnMut()>::new(settle);
     if let Some(w) = web_sys::window() {
@@ -543,8 +547,14 @@ fn settle() {
         }
         changed
     });
+    // A live view on screen while work goes on: drawn again on the tick,
+    // so a started command's output moves and a file shows as it is saved
+    // (the window does the same, `AppView::refresh_live`).
+    let live = with(|a| a.location.ends_with("/live") && ((0..a.world.state.engines.len()).any(|i| a.busy(i)) || crate::env::running()));
     if changed == Some(true) {
         save();
+        render();
+    } else if live == Some(true) {
         render();
     }
     for (i, resume) in run {
@@ -615,7 +625,7 @@ fn render() {
     let scroll = by_id("main").map_or(0, |m| m.scroll_top());
 
     let drawn = with(|a| {
-        a.world.clock = Browser.clock();
+        a.world.clock = dry_core::live::Time::clock(&Browser);
         let p = page::parts(&a.world, &a.location, &a.query);
         // The scene setting's scene, in the colours it has with the theme and mode on screen.
         let scene = page::theme_of(&a.world, &a.location, &a.query).ok().map(|(th, m)| {
@@ -727,7 +737,7 @@ fn welcome(show: bool) {
                     "<div class=\"glass panel\"><h2>dry, in this browser</h2>\
                      <p class=\"note\">The whole app runs in this page: engines, their turns, the asks. Nothing is sent anywhere but the model server you set; everything is kept in this browser ({}).</p>\
                      <div class=\"row\"><button class=\"btn primary\" type=\"button\" data-act=\"load-demo\">Load demo</button><button class=\"btn\" type=\"button\" data-act=\"start-empty\">Start with the translator</button></div>\
-                     <p class=\"note\">The translator is dry's default engine: it turns what you ask into a brief for a developer engine and judges what comes back (docs/default.md). The demo shows engines with a history, artifacts, a child engine and asks, with no model server needed. To talk to a model, start LM Studio's server with CORS on (Developer → Settings), then Settings → Models → Detect.</p></div>",
+                     <p class=\"note\">The translator is dry's default engine: it turns what you ask into a brief for a developer engine and judges what comes back (docs/default.md). The demo shows engines with a history, artifacts, a child engine and asks, with no model server needed. When it opens, the page looks for a model server on this computer (LM Studio, oMLX, Ollama) and uses the one with a model loaded; Home's Model server card says which. None found: start one with CORS on, then Settings → Models → Detect.</p></div>",
                     with(|a| a.world.store.clone()).unwrap_or_default()
                 ));
                 let _ = body.append_child(&w);
@@ -987,7 +997,7 @@ fn act(b: &Element) {
                 return;
             }
             with(|a| {
-                a.world.state = demo::state(&a.settings.inference(), Browser.clock().day());
+                a.world.state = demo::state(&a.settings.inference(), dry_core::live::Time::clock(&Browser).day());
                 a.first_run = false;
                 a.forget_reports();
             });
@@ -1185,7 +1195,7 @@ fn answer(b: &Element) {
             .map(|i| i.value())
     };
     let day = |e: &Element, a: &str| attr(e, a).and_then(|d| d.parse::<i64>().ok());
-    let today = Browser.clock().day();
+    let today = dry_core::live::Time::clock(&Browser).day();
     let answer = match &ask {
         Ask::Choice { .. } => Answer::Choice(value),
         Ask::Multi { .. } => Answer::Multi(
@@ -1324,6 +1334,68 @@ fn set_check(status: Status, detected: Option<Result<Vec<String>, String>>) {
     render();
 }
 
+/// What the model server at `base` has: its list, and what LM Studio's
+/// or oMLX's own endpoint says of each (its type, which are loaded).
+async fn served_at(base: &str, key: Option<String>) -> Result<Vec<dry_core::served::ServedModel>, String> {
+    use dry_core::runner::Transport;
+    use dry_core::served;
+    let fetch = Fetch { key };
+    let models = fetch.get(&format!("{base}/models"), &None).await.and_then(|b| served::parse_openai(&b))?;
+    let more = fetch.get(&format!("{}/api/v0/models", served::server_root(base)), &None).await;
+    let models = served::merge(models, more.ok().and_then(|b| served::parse_lmstudio(&b).ok()).unwrap_or_default());
+    // oMLX says which are loaded on its own endpoint.
+    let status = fetch.get(&format!("{base}/models/status"), &None).await;
+    Ok(served::merge(models, status.ok().and_then(|b| served::parse_omlx_status(&b).ok()).unwrap_or_default()))
+}
+
+/// The server at `base` answered with `models`: list them (the loaded
+/// ones that chat first), and with no model chosen yet take the first
+/// choice, never an embeddings model (`served::first_choice`).
+fn use_served(base: &str, models: &[dry_core::served::ServedModel]) {
+    use dry_core::served;
+    let ordered: Vec<String> = served::ordered(models).into_iter().map(|m| m.id.clone()).collect();
+    let loaded: Vec<&str> = models.iter().filter(|m| m.loaded == Some(true)).map(|m| m.id.as_str()).collect();
+    let line = if loaded.is_empty() {
+        format!("{} models listed at {base}", models.len())
+    } else {
+        format!("{} models listed at {base}; loaded now: {}", models.len(), loaded.join(", "))
+    };
+    with(|a| {
+        if a.settings.model.is_empty()
+            && let Some(first) = served::first_choice(models)
+        {
+            apply_connection(a, base.to_string(), first.id.clone());
+        }
+    });
+    save();
+    set_check(Status::Done(line), Some(Ok(ordered)));
+}
+
+/// A first visit, no model chosen: ask the local model servers a person
+/// is likely to run (`settings::LOCAL_SERVERS`) and use the one that
+/// has a model loaded (`served::first_server`), so a page opened beside
+/// one is ready without a visit to Settings. None answers: the note says which
+/// were asked and what to do.
+async fn find_model_server() {
+    set_check(Status::Working("looking for a model server on this computer".into()), None);
+    // Every server is asked, then one is taken: the first with a model
+    // already in memory, else the first with a model that chats.
+    let mut found = Vec::new();
+    for (_, base) in settings::LOCAL_SERVERS {
+        if let Ok(models) = served_at(base, None).await {
+            found.push((*base, models));
+        }
+    }
+    if let Some((base, models)) = dry_core::served::first_server(&found) {
+        return use_served(base, models);
+    }
+    let asked: Vec<String> = settings::LOCAL_SERVERS.iter().map(|(name, base)| format!("{name} ({base})")).collect();
+    set_check(
+        Status::Missing(format!("no model server answered: asked {}. Start one with CORS on, then Settings → Models → Detect", asked.join(", "))),
+        Some(Err("none found".into())),
+    );
+}
+
 fn connection_act(what: &str, value: Option<String>) {
     let endpoint = field("endpoint").map(|e| settings::clean_endpoint(&e)).filter(|e| !e.is_empty());
     let model = field("model");
@@ -1359,45 +1431,10 @@ fn connection_act(what: &str, value: Option<String>) {
             set_check(Status::Working(format!("asking {base}/models")), None);
             let key = with(|a| a.settings.key.clone()).flatten();
             spawn_local(async move {
-                let fetch = Fetch { key };
-                use dry_core::runner::Transport;
-                let listed = fetch.get(&format!("{base}/models"), &None).await;
-                let ids = listed.and_then(|b| dry_core::inference::parse_model_ids(&b).map_err(|e| format!("{e:?}")));
-                let ids = match ids {
-                    Ok(ids) => ids,
-                    Err(why) => return set_check(Status::Failed(why), Some(Err("not listed".into()))),
-                };
-                // LM Studio says which are loaded: those first, and the
-                // first of them chosen when none is.
-                let root = base.trim_end_matches("/v1");
-                let loaded: Vec<String> = match fetch.get(&format!("{root}/api/v0/models"), &None).await {
-                    Ok(body) => serde_json::from_str::<serde_json::Value>(&body)
-                        .ok()
-                        .and_then(|v| v.get("data")?.as_array().cloned())
-                        .unwrap_or_default()
-                        .iter()
-                        .filter(|m| m.get("state").and_then(|s| s.as_str()) == Some("loaded"))
-                        .filter_map(|m| m.get("id")?.as_str().map(str::to_string))
-                        .collect(),
-                    Err(_) => Vec::new(),
-                };
-                let mut ordered: Vec<String> = ids.iter().filter(|i| loaded.contains(i)).cloned().collect();
-                ordered.extend(ids.iter().filter(|i| !loaded.contains(i)).cloned());
-                let line = if loaded.is_empty() {
-                    format!("{} models listed", ids.len())
-                } else {
-                    format!("{} models listed; loaded now: {}", ids.len(), loaded.join(", "))
-                };
-                with(|a| {
-                    if a.settings.model.is_empty()
-                        && let Some(first) = loaded.first().or(ordered.first())
-                    {
-                        let e = base.clone();
-                        apply_connection(a, e, first.clone());
-                    }
-                });
-                save();
-                set_check(Status::Done(line), Some(Ok(ordered)));
+                match served_at(&base, key).await {
+                    Ok(models) => use_served(&base, &models),
+                    Err(why) => set_check(Status::Failed(why), Some(Err("not listed".into()))),
+                }
             });
         }
         "test" => {

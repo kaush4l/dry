@@ -5,7 +5,9 @@ description: Check a running web app through the browser artifact - open the pag
 # Browser QA: use the page like a person
 
 You have this only when the browser artifact is present (a companion with
-Chrome, or a host that drives one). Its snapshot is the page as text
+Chrome, or a host that drives one). When your Artifacts hold no browser
+and your tools no `browse`, this skill does not apply: check the file with
+a command instead and report the page as not opened. Its snapshot is the page as text
 (roles, names, values), its console errors and the last screenshot's path.
 
 1. **Open it.** `browse(url="http://127.0.0.1:PORT/the/route")`. Only this

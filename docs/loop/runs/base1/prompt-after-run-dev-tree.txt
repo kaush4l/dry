@@ -1,0 +1,311 @@
+[System]
+## Instructions
+
+### Goal — what you are for, and who you serve
+A Python script that prints a centered tree of height n: level k has 2k-1 '*' (level 1: 1, level 2: 3, ...), each line centered on the widest line, with n read from the command line.
+
+### Scope — what you do alone, when you stop and ask, what you never do
+Create the script in the project root. It may also add a small test if the project already has a test convention. Stop and reply if the project has an existing script this conflicts with. Never commit, push or publish.
+
+### Done — what a finished result looks like, and how you show it
+The script exists, runs with a height argument, and prints the centered tree; show the output for height 5. Reply with: Changed / Ran / Saw / Unverified / Also changed.
+
+## Phase
+
+The plan:
+1. triage — Your one reply is your report, and it ends your work: reply only at the end of the test phase, to ask a question you cannot answer by reading, or with the plan when your instructions say "plan first"; never to say what you are doing, and never in the same act as a run: a report quotes results you have already read. Read the notes artifact and the plan artifact first. If the plan artifact holds your plan and the new message approves it, goto_phase(name="code") at once; if the message asks for changes or holds review findings, those are your starting point. Otherwise understand how the thing works today before you change anything. Load the triage skill. Open the files the ask touches (open, focus) and follow the flow from where it starts to the behaviour asked about. Confirm it with read-only commands (ls, grep, git status, git log, the tests as they are now). Read all the evidence there is: evidence(op="read") when the project has an evidence.md, the page in your browser artifact when the app runs. Restate the ask in one line. Load the plan skill and write the plan with write(name="plan", text="..."): how it works now (file:line), the steps as `- [ ]` lines (each file and what changes, the test), and the proof with the command that runs it. Change no file in this phase: no edit, no save. Triage is done only when the plan artifact holds your plan. Then, if your instructions say "plan first", reply with the plan in short (Ask, Steps, Proof, Out of scope; under 1500 characters) and stop: the approval comes as a new message. Otherwise goto_phase(name="code").
+2. code — Do the plan's steps in order, file by file: open, edit, save. Load the code-style skill and write in the style of the code around you. Add the test the plan names. After each saved file, run the project's quickest compile or type check (the one code-style names) and fix what your edit broke; when the same error survives three fixes, stop editing, write it in the notes and goto_phase(name="triage"). Tick each step when its file is saved and compiles: write the plan again with that step as `- [x]`. Change nothing the plan does not name. If the plan turns out wrong, add what you found to the notes (write the notes with what was there and your lines added) and goto_phase(name="triage"). The tests are for the test phase. When every step is ticked, goto_phase(name="test").
+3. **test** ← now, step 6
+
+Now, test:
+Build it, run it, use it, then judge it. Load the test skill. Run the project's checks with run: build, tests, lint, whatever the project declares. When the change shows in a running app, start it with background and look at it: browse it if you have a browser artifact (load browser-qa), evidence(op="run", expect="...") if the project has an evidence.md, else run the program and read its output. Then load the critique skill and compare what you saw with the plan, its steps and the ask. Pass: reply once, with the report your instructions ask for (Changed / Ran / Saw / Unverified / Also changed), each line backed by a command you ran in this phase. Fail: write the notes (what failed, the exact output, what to change next) and goto_phase(name="triage"). A failure that comes back the same way twice: load debugging before you change anything else.
+
+When it is done (or the work needs another phase), call goto_phase(name="..."). What was done so far is in the history. Reply when the whole work is done.
+
+## Tools
+
+Call these in `act`:
+- reply(text="...", ask="...", show="..."): Answer the user. Ends your turn. (text: what to say; ask: optional: an ask component, below; show: optional: a display component, below) To ask the user something, add ask= and they get a control instead of typing; their answer comes back as your next message, like `Answer (date): 2026-11-24 (Tue)`. One ask per reply. Use the one that fits:
+  choice (pick one): reply(ask="choice", options="Red|Green|Blue", text="Which colour?")
+  multi (pick any): reply(ask="multi", options="unit|ui|e2e", text="Which tests should I run?")
+  confirm (yes or no to one short question, no details): reply(ask="confirm", text="Delete the old logs?")
+  date (a day): reply(ask="date", text="Which day?")
+  datetime (a day and a time): reply(ask="datetime", text="When should I run it?")
+  number (how many, how much): reply(ask="number", min="1", max="10", unit="copies", text="How many copies?")
+  text (a short typed answer): reply(ask="text", placeholder="project name", text="What is the project called?")
+  review (show the details of a plan to check, edit or reject before you act): reply(ask="review", title="Deploy", rows="env: staging|time: 18:00", text="Is this right?")
+  form (several questions at once): reply(ask="form", title="Booking", fields="Day:date|Guests:number(1-12)|Seat:choice(inside,terrace)|Notes:text", text="A few details for the table:")
+Options and rows are separated by |. A form's fields are Label:kind, with options or a range in brackets. To show data with a reply, add show= and data= (it can go with an ask=); the user sees a real table, list, bar or numbers. One show per reply:
+  table (rows and columns): reply(show="table", data="Name|Age;Ada|36;Bob|41", text="Here are the users.")
+  list (a few items): reply(show="list", data="lint passed|3 tests failed|build skipped", text="The CI run:")
+  progress (how far along): reply(show="progress", data="7/10 tests passed", text="Still running.")
+  stat (headline numbers): reply(show="stat", data="Revenue|$12.4k|+8%;Users|1204|-3%", text="This week:")
+In data, | separates the cells of a row and ; the rows; a table's first row is its header, a stat is label|value|change.
+- write(name="...", text="..."): Save an artifact (replaces one of the same name). (name: a short name; text: its whole content)
+- read(name="..."): Read an artifact. (name: its name)
+- list(): The names of all artifacts.
+- skill(name="..."): Load one of your skills (listed in the skills artifact): its instructions come back, and its tools are yours until the next message. (name: the skill's name)
+- open(path="..."): Open a file of your file artifact: its text is in the artifact from now on, as it is on disk at every step. Open several at once with `|`: path="src/a.rs|src/b.rs". (path: relative to its root)
+- focus(path="...", from="...", to="..."): Show only these lines of an open (or not yet open) file, for a big one. (path: relative to its root; from: first line; to: last line)
+- edit(path="...", old="...", new="..."): Change an open file: the old text (exactly once in it) becomes the new. Held as unsaved, shown marked *, until save. (path: an open file; old: the text to replace, exactly; new: what it becomes)
+- save(path="..."): Write a file's unsaved edits to disk. (path: the file)
+- run(command="..."): Run a shell command in the terminal's root and wait for it. Back: its exit code and last lines. For a long one use start. (command: the command line)
+- start(command="..."): Start a long command and go on at once; when it ends a message wakes you. Its output is in the terminal artifact. (command: the command line)
+- background(command="..."): Start a command that keeps running (a server, a watcher); no message when it ends. Its state is in the terminal artifact. (command: the command line)
+- browse(url="..."): Open a page of an app on this machine (localhost) in your browser artifact: its text, console errors and a screenshot are in the artifact from now on. (url: http://127.0.0.1:…/ or http://localhost:…/)
+- click(target="..."): Click an element of the open page: a CSS selector, or the text it shows (a button's, a link's). (target: a selector or the visible text)
+- type(target="...", text="..."): Type text into a field of the open page; key="Enter" presses a key after. (target: a selector, the field's label or placeholder; text: what to type)
+- evidence(op="...", expect="..."): The project's evidence (docs/evidence.md): op="run" builds and starts the app, shoots every scenario and compares with the committed baseline; op="read" reads the last run. Back: one line; the summary is in the evidence artifact. Optional: expect="home,settings" (scenarios your change should change: those pass), update="yes" (take every shot as the new baseline). (op: run or read; expect: optional: scenarios expected to change, comma separated)
+- post(text="...", to="..."): Post a directed message on your thread (you, your head and every engine of its tree see it). Only the engine named in `to` is called; say what, why, what done looks like and where the material is, so it can act without having seen anything else. (text: the message, at most 600 characters; to: the engine's id, or `you` for the person; a post with no `to` comes back to you undelivered)
+- edit_post(n="...", text="..."): Change an entry of yours in the shared context; text="" removes it. (n: the entry's number; text: its new text, or "")
+- goto_phase(name="..."): Move to another phase of the plan (see Phase): on when this one is done, or back when the work needs it. (name: the phase to go to)
+
+## Artifacts
+
+### notes (75 characters)
+
+## Notes
+
+(none yet: a failed test writes here, and triage reads it first)
+
+### plan (910 characters)
+
+## Ask
+No tree script exists → `python3 tree.py N` prints a tree of N levels, level k has 2k-1 '*' (level 1: 1, level 2: 3, ...), each line centered on the widest (bottom) line (width 2N-1).
+
+## Now
+- project root — empty (ls: only . and ..); no code, no tests, no git repo
+
+## Steps
+- [x] 1. tree.py — new script: argv[1] = height n; for k in 1..n, print (2k-1) '*' centered on width 2n-1 (total line width = 2n-1; pad equally on both sides, remainder to the left). Handle bad/missing argv with a clear usage message and non-zero exit.
+
+## Proof
+- `python3 tree.py 5` — passes when output is:
+    *
+   ***
+  *****
+ *******
+*********
+  (each line centered, e.g. level 1 = 4 spaces + '*' + 4 spaces = 9-wide line)
+- `python3 tree.py` (no arg) — prints usage and exits non-zero
+
+## Out of scope
+- tests/CI (no test convention in the project; adding one is beyond the ask)
+- any change to other files (none exist)
+
+### skills — your skills
+
+Load one with skill(name="...") when the work needs it.
+- browser-qa: Check a running web app through the browser artifact - open the page, use it the way a person would, read its text and console errors, and record what was seen.
+- critique: Judge the result against the plan and the ask before replying - only findings you can show count - then pass with the report, or fail back to triage with notes.
+- debugging: When something fails and the cause is not obvious - build a fast loop that shows the failure, then test one hypothesis at a time; never guess-and-edit.
+- test: Build, run and exercise the change with whatever this machine offers (terminal, evidence, browser, native runtimes such as bun), then hand the result to critique.
+
+### code — files on disk as they are now, and the ones you have open
+
+(taken when the prompt is sent)
+
+### terminal — your terminal: what is running and what last ran
+
+(taken when the prompt is sent)
+
+### shared — your thread: the user and every engine of your tree; how you talk to each other
+
+(taken when the prompt is sent)
+
+### browser — a page in a browser as it is now: its text, its console errors, its last screenshot
+
+(taken when the prompt is sent)
+
+### evidence — the project's evidence: every scenario's screenshot and page text against the committed baseline, and what changed
+
+(taken when the prompt is sent)
+
+## Earlier conversation (summary)
+
+The user's ask: create a Python script that prints a centered tree of height `n`. Level `k` has `2k−1` stars (level 1: 1, level 2: 3, …), each line centered on the widest (bottom) line (width `2n−1`), with `n` taken from argv.
+
+Response contract (hard requirement): the harness rejects answers lacking an `act:` / `key: value` line ("Your answer did not follow the response contract"). Working pattern: brief thought, then `act: ...`.
+
+Workflow so far:
+1. Notes and plan artifacts were empty at first; triage was done via `skill(name="triage")`: nothing exists to preserve; new-script task; single clear spec.
+2. Plan skill loaded; plan written via `act: write(name="plan", text="...")`. Plan format: `## Ask` (No tree script exists → `python3 tree.py N` prints a tree of N levels, level k has 2k−1 '*', each line centered on the widest/bottom line, width 2N−1); `## Now` (project root — empty, only `.` and `..`; no code, no tests, no git repo); `## Steps` (`- [ ]` one line per file/test); `## Proof`; `## Out of scope`.
+3. Script created as `tree.py` (36 lines), compiles. `open(path="tree.py")` opened it (36 lines).
+4. Plan was re-written with step 1 ticked: `- [x] 1. tree.py — new script: argv[1] = height n; for k in 1..n, print (2k-1) '*' centered on width 2n-1 (total line width = 2n-1; pad equally on both sides, remainder to the left). Handle bad/missing argv with a clear usage message and non-zero exit.`
+
+Proof in the plan (not yet run):
+- `python3 tree.py 5` — passes when output is:
+  ```
+       *
+      ***
+     *****
+    *******
+   *********
+  ```
+  Wait — the plan's exact expected text is the five lines `*`, `***`, `*****`, `*******`, `*********` centered on a 9-wide line (level 1 = 4 spaces + `*` + 4 spaces; bottom level = 9 stars, unpadded).
+- `python3 tree.py` (no arg) — prints usage and exits non-zero.
+
+Out of scope per the plan: tests/CI (no test convention in the project; adding one is beyond the ask); any change to other files (none exist).
+
+Key facts: project root previously empty; no git repo; no existing style to copy; notes artifact still empty. `tree.py` exists and compiles (36 lines), and was opened/tracked.
+
+Still open / next: the assistant said it wanted to run the script to check output before ticking the step, opened `tree.py`, but then ticked step 1 in the plan without actually running `python3 tree.py 5` or `python3 tree.py` yet. Remaining: run both proof commands and confirm the output matches the plan's expected centered tree (and that the no-arg run prints usage and exits non-zero); if correct, the plan's single step is complete and the task can be reported…
+
+[User]
+The person asked: 'Write a python script to print a tree of height n where each level has 2 more '*'. Make it center aligned.' Natural reading: height n = n levels; level 1 has 1 star; each level adds 2 stars; each line centered in the width of the widest (bottom) line. Take n from argv (e.g. python3 tree.py 5). No dependencies beyond the standard library.
+
+## Response
+
+Answer with one line per key, written `key: value`, in this order, and nothing else. A long value may go on over the next lines. The keys:
+- thought: A few sentences: what was asked, what is really needed, and what you do next and why.
+- act: The tool calls for this step, written `name(key="value")` and separated by `;`. Put every call this step needs in one `act` (open three files, edit, run the tests, ask two children): they all start at once; changes like open and edit apply first in the order written, then everything that waits (run, engine_call, MCP tools) waits together, and the results come back in the order written. To answer the user, call `reply(text="...")`. To ask them something, add one `ask=` to the reply (see reply in Tools) instead of asking in words; to show them a table, list, progress or numbers, add `show=`.
+Like this:
+thought: ...
+act: ...
+
+[Tool]
+write(name="plan", text="## Ask\nNo tree script exists → `python3 tree.py N` prints a …") → saved plan (910 characters)
+
+[Assistant]
+thought: The plan step is ticked and the file compiles. Now go to test.
+act: goto_phase(name="test")
+
+[Tool]
+goto_phase(name="test") → left code; now test
+
+[Assistant]
+thought: Code phase is done. Entering test: load the test skill, then run the script to verify output.
+act: skill(name="test")
+
+[Tool]
+skill(name="test") → Skill `test` loaded. Follow it:
+
+# Test: build it, run it, use it
+
+Only the declared checks count, run here, now, on the saved files.
+
+1. **Build and test.** Run the project's own commands: `bun test`,
+   `npm test`, `cargo test -q`, `cargo clippy -q --all-targets`,
+   `make test`, as the project declares them. Read the exit code and the
+   last lines. A long build goes to `start` (a message comes when it ends).
+2. **Run it.** Use the program the way its user would:
+   - a CLI or library: `run` it with the input from the plan, read the output;
+   - a web app: `background` its dev server, wait until it is up
+     (`run(command="curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:PORT/")`),
+     then browse it if you have a browser artifact (load browser-qa);
+   - a project with an `evidence.md`: `evidence(op="run", expect="<the
+     scenarios the plan said would change>")`. An expected change passes,
+     anything else fails with its shot and text lines.
+   - Bun's runtime runs TypeScript directly: `bun run file.ts`, `bun test`,
+     `bun -e 'console.log(...)'` for a quick check of one function.
+3. **Stop what you started.** A server you started with `background` is
+   still running when you finish. Stop it (`run(command="kill <pid>")`, or
+   the project's stop command) before you reply.
+4. **Say what you could not run.** No browser artifact, no evidence.md, no
+   network: that goes in the report as Unverified, with why.
+5. **Never work around the environment.** A missing tool, a port in use or
+   a timeout is reported as what it is. Do not change code to dodge it.
+
+Then load critique.
+
+Ideas from gstack's `build-check` (declared checks only, typed verdicts,
+never weaken a test) and `qa`, both MIT; written for dry.
+
+[Assistant]
+thought: No build/test commands exist (no package.json, no test convention). I'll run the program the way its user would: `python3 tree.py 5` and `python3 tree.py` (no arg), check output and exit codes.
+act: run(command="python3 tree.py 5; echo \"exit=$?\"; echo ---; python3 tree.py; echo \"exit=$?\"; echo ---; python3 tree.py 0; echo \"exit=$?\"; echo ---; python3 tree.py abc; echo \"exit=$?\"")
+
+[Tool]
+run(command="python3 tree.py 5; echo "exit=$?"; echo ---; python3 tree.py…") → session 3 `python3 tree.py 5; echo "exit=$?"; echo ---; python3 tree.py; echo "exit=$?"; ec…`: exit 0
+    *    
+   ***   
+  *****  
+ ******* 
+*********
+exit=0
+---
+Usage: python3 tree.py N
+exit=2
+---
+Error: height must be a positive integer
+exit=2
+---
+Error: invalid height 'abc': not a number
+exit=2
+
+[Assistant]
+thought: Output is correct and centered. Load critique to judge against the plan and ask before replying.
+act: skill(name="critique")
+
+[Tool]
+skill(name="critique") → Skill `critique` loaded. Follow it:
+
+# Critique: is it right, shown?
+
+Review your own work as a stranger would. You have the plan artifact, the
+terminal output, the page or evidence, and the saved files.
+
+1. **Against the ask.** Does the behaviour now match the desired line of the
+   plan, exactly? Quote the output or page text that shows it.
+2. **Against the plan.** Every step is ticked (`- [x]`) and was made and
+   saved. Nothing
+   outside it changed: run `git status --short` and `git diff --stat` and
+   compare with the plan's list.
+3. **Against the code around it.** Same style, no debugging prints left,
+   no new warnings in the build output.
+4. **Findings need proof.** A finding counts only if you can point at a
+   line or rerun a command that shows it. Style preferences and "might
+   break someday" are not findings. No findings is a complete result.
+5. **Severity.** A blocker fails the test (a wrong result, a failing check,
+   lost data, a leaked secret). Anything smaller goes in the report and
+   does not block.
+
+**Pass**: reply, in a step of its own after the runs it quotes (never in
+the same act as a run: the report quotes results you have read), with
+
+```text
+Changed: each file, one line on what changed
+Ran: each command, with its exit code and last line
+Saw: what the running app or output showed, in its own words
+Unverified: what you could not check, and why (or "nothing")
+Also changed: anything outside the plan (or "nothing")
+```
+
+**Fail**: write the notes, keeping what was there:
+
+```text
+## Notes
+### test <n>: failed
+- what failed: the command or step
+- output: the exact lines
+- why, as far as you can tell
+- next: what triage should look at
+```
+
+Then `goto_phase(name="triage")`.
+
+Ideas from gstack's `review` (blocker / should / nit, "no findings" is a
+result), pstack's `interrogate` (proof by rerun) and Matt Pocock's
+`code-review` (judge against the spec and the standards separately), all
+MIT; written for dry.
+
+[Assistant]
+thought: Let me confirm nothing outside the plan changed (git status) before replying.
+act: run(command="git status --short 2>&1; echo \"exit=$?\"; ls -la")
+
+[Tool]
+run(command="git status --short 2>&1; echo "exit=$?"; ls -la") → session 4 `git status --short 2>&1; echo "exit=$?"; ls -la`: exit 0
+fatal: not a git repository (or any parent up to mount point /Volumes)
+Stopping at filesystem boundary (GIT_DISCOVERY_ACROSS_FILESYSTEM not set).
+exit=128
+total 4
+drwxr-xr-x  3 kaush staff  96 Nov 23 22:19 .
+drwxr-xr-x 13 kaush staff 416 Nov 23 22:23 ..
+-rw-r--r--  1 kaush staff 864 Nov 23 22:19 tree.py
+
+[Assistant]
+thought: All checks pass. The only file in the project is tree.py (not a git repo, so git status can't run). Output is exactly the centered tree the plan specifies. Reply with the report.
+act: reply(text="Changed: tree.py (new) — `python3 tree.py N` prints a centered tree of N levels, level k has 2k-1 '*' (level 1: 1, level 2: 3, ...), each line centered on the widest/bottom line (width 2N-1). Bad/missing/non-numeric args print usage to stderr and exit 2.\nRan: `python3 tree.py 5` — exit 0, output is the 5-level centered tree (4sp + * + 4sp; 3sp + *** + 3sp; 2sp + ***** + 2sp; 1sp + ******* + 1sp; 9 stars). `python3 tree.py` — exit 2, usage on stderr. `python3 tree.py 0` — exit 2, 'height must be a positive integer'. `python3 tree.py abc` — exit 2, 'invalid height'.\nSaw: output is exactly the plan's expected centered tree; every line is 9 wide, bottom line 9 stars.\nUnverified: nothing — no tests/CI in the project (none declared), so the declared check is running the script itself; not a git repo, so `git status`/`git diff` could not be run.\nAlso changed: nothing outside the plan (only tree.py in the project).")
+
+[not sent]
+- Learning: nothing learned yet (memory/learning.md is empty)

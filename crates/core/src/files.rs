@@ -9,6 +9,7 @@
 //!     responses.md     its response contract (if it has one)
 //!     tools.md         its tools, one `- name` line each
 //!     skills/<name>/SKILL.md  its skills (`crate::skill`)
+//!     skills/<name>/tools.md  the tools a skill brings of its own (`crate::skilltool`)
 //!     template.md      how its prompt is laid out, and its phases (`crate::template`)
 //!     templates/<name>/…  templates it starts children from (`crate::kit`)
 //!     elements.md      extra elements it holds, one id per line (`crate::element::held`)
@@ -103,6 +104,7 @@ pub fn spec_files(e: &Engine) -> Vec<(String, String)> {
         files.extend(items.iter().map(|(name, text)| (format!("{folder}/{name}.md"), text.clone())));
     }
     files.extend(e.skills.iter().map(|(name, text)| (skill_file(name), text.clone())));
+    files.extend(e.skill_tools.iter().map(|(name, text)| (crate::skilltool::file(name), text.clone())));
     files.extend(e.templates.iter().map(|(path, text)| (format!("{}{path}", crate::kit::FOLDER), text.clone())));
     files
 }
@@ -175,6 +177,10 @@ pub fn apply_spec(e: &mut Engine, files: &BTreeMap<String, String>) -> Result<()
         }
         if let Some(name) = file.strip_prefix("skills/").and_then(|f| f.strip_suffix("/SKILL.md")) {
             e.skills.insert(name.to_string(), text.clone());
+            continue;
+        }
+        if let Some(name) = file.strip_prefix("skills/").and_then(|f| f.strip_suffix(&format!("/{}", crate::skilltool::FILE))) {
+            e.skill_tools.insert(name.to_string(), text.clone());
             continue;
         }
         let Some((folder, name)) = file.strip_suffix(".md").and_then(|f| f.split_once('/')) else { continue };
@@ -361,6 +367,10 @@ fn run_md(e: &Engine) -> String {
     if let Some(h) = e.heard.filter(|h| *h != crate::snapshot::Cursor::default() || !e.messages.is_empty()) {
         md.push_str(&format!("heard: {}\n", h.text()));
     }
+    // One line per alert: when it was first seen and last fired (`crate::alert::Mark`).
+    for (name, mark) in &e.alert_marks {
+        md.push_str(&format!("alert: {name} {}\n", mark.to_line()));
+    }
     md
 }
 
@@ -383,6 +393,12 @@ pub fn from_files(id: &str, f: &EngineFiles) -> Result<Engine, String> {
     e.run = crate::phase::Run::from_md(&f.run, &e.phase_list().unwrap_or_default());
     e.loaded_skills = run_list(&f.run, "skills:");
     e.waiting = run_list(&f.run, "waiting:");
+    e.alert_marks = f
+        .run
+        .lines()
+        .filter_map(|l| l.strip_prefix("alert: "))
+        .filter_map(|l| l.split_once(' ').and_then(|(name, rest)| Some((name.to_string(), crate::alert::Mark::from_line(rest)?))))
+        .collect();
     // No line: a new engine (nothing heard) if it has no messages yet,
     // else a store from before the guided rule (`crate::desk::guided`).
     // A cursor from before threads (`3.5`) counted other files: dropped,

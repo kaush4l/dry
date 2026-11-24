@@ -19,9 +19,10 @@
 //! Artifacts are shown as they are now: a plain one by its
 //! text, a kind (`crate::live`) by its snapshot, the clock last; a
 //! snapshot is never written into the messages or the artifact. The
-//! response goes at the end of the newest user message (not a second
-//! system message, which some local chat templates refuse), so it really
-//! is the last thing read.
+//! response goes at the end of the newest message sent in the user's role
+//! (your text, or the last calls' results; not a second system message,
+//! which some local chat templates refuse), so it really is the last
+//! thing read at every step.
 //!
 //! A slot with nothing in it is not sent, but the prompt view lists it
 //! with why (`Rendered::empty`), so nothing is missing silently.
@@ -213,7 +214,7 @@ impl Rendered {
     }
 
     /// The messages to send: the system prompt, then the history with the
-    /// response contract after the newest user message.
+    /// response contract after its newest user or results message.
     pub fn messages(&self) -> Vec<Message> {
         let mut out = Vec::new();
         let system = self.system_text();
@@ -221,8 +222,13 @@ impl Rendered {
             out.push(Message { role: Role::System, text: system });
         }
         out.extend(self.history.iter().cloned());
+        // After the newest message the model reads as the user's: your
+        // text, or the results of its last calls (sent in the user's
+        // role). A contract left on the first message of a long turn sits
+        // behind every result since, and a model that has just read a
+        // long skill answers in prose.
         if !self.response.is_empty()
-            && let Some(last) = out.iter_mut().rev().find(|m| m.role == Role::User)
+            && let Some(last) = out.iter_mut().rev().find(|m| matches!(m.role, Role::User | Role::Tool))
         {
             last.text = format!("{}\n\n## {}\n\n{}", last.text, self.response_title, self.response);
         }

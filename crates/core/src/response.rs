@@ -208,6 +208,8 @@ impl ResponseFormat for Toon {
     fn parse(&self, r: &Responses, text: &str) -> Result<Answer, String> {
         let sep = self.separator.trim();
         let mut values: Vec<(String, String)> = Vec::new();
+        // What is written before the first key.
+        let mut before: Vec<&str> = Vec::new();
         for line in unfence(text).lines() {
             if line.trim_start().starts_with("```") {
                 continue; // a fence the model put around part of it
@@ -224,7 +226,37 @@ impl ResponseFormat for Toon {
                     v.push('\n');
                     v.push_str(line);
                 }
-                (None, None) => {} // text before the first key: dropped
+                (None, None) => before.push(line),
+            }
+        }
+        // Two slips a model makes that lose nothing, read instead of
+        // refused (each only where a field would otherwise be missing):
+        // prose before the first key is the contract's first field when
+        // that key was not written (`I will list them.` then `act: ...`);
+        // and a key glued to the end of another field's line opens its
+        // field there (`thought: read it first.act: read(...)`).
+        let has = |values: &[(String, String)], key: &str| values.iter().any(|(k, _)| k == key);
+        if let Some(first) = r.fields.first().filter(|f| !has(&values, &f.key))
+            && !values.is_empty()
+            && !before.join("\n").trim().is_empty()
+        {
+            values.insert(0, (first.key.clone(), before.join("\n")));
+        }
+        for f in r.fields.iter().filter(|f| !f.optional) {
+            if has(&values, &f.key) {
+                continue;
+            }
+            let glued = format!("{}{sep}", f.key);
+            let found = values.iter().enumerate().find_map(|(i, (_, v))| {
+                // The last one in the value, not part of a longer word.
+                let at = v.rmatch_indices(&glued).map(|(at, _)| at).find(|at| !v[..*at].ends_with(|c: char| c.is_alphanumeric() || c == '_'))?;
+                Some((i, at))
+            });
+            if let Some((i, at)) = found {
+                let rest = values[i].1[at + glued.len()..].to_string();
+                let kept = values[i].1[..at].to_string();
+                values[i].1 = kept;
+                values.insert(i + 1, (f.key.clone(), rest));
             }
         }
         // TOON first; an answer the model wrote as JSON instead still reads.
@@ -330,6 +362,26 @@ mod tests {
         let a = Format::default().parse(&r, text).unwrap();
         assert_eq!(Responses::get(&a, "thought"), Some("first line\nsecond line"));
         assert_eq!(Responses::get(&a, "act"), Some("reply(text=\"ok\")"));
+    }
+
+    #[test]
+    fn toon_reads_prose_before_the_act_as_the_thought_and_a_key_glued_to_a_line() {
+        let r = contract();
+        let toon = Format::default();
+        // The first key not written: what stands before the act is it.
+        let a = toon.parse(&r, "The folder is empty.\nI will write the file.\nact: list()").unwrap();
+        assert_eq!((Responses::get(&a, "thought"), Responses::get(&a, "act")), (Some("The folder is empty.\nI will write the file."), Some("list()")));
+        // `act:` at the end of the thought's line, as Inkling wrote it.
+        let a = toon.parse(&r, "thought: read the notes and the plan first.act: read(name=\"notes\"); read(name=\"plan\")").unwrap();
+        assert_eq!(Responses::get(&a, "thought"), Some("read the notes and the plan first."));
+        assert_eq!(Responses::get(&a, "act"), Some("read(name=\"notes\"); read(name=\"plan\")"));
+        // Not inside a longer word, and never when the act is written on its own line.
+        assert_eq!(toon.parse(&r, "thought: the fact: it is empty").unwrap_err(), "the answer has no act");
+        let a = toon.parse(&r, "thought: I will act: carefully\nact: list()").unwrap();
+        assert_eq!((Responses::get(&a, "thought"), Responses::get(&a, "act")), (Some("I will act: carefully"), Some("list()")));
+        // Still an error with nothing to read as the act, or nothing at all.
+        assert_eq!(toon.parse(&r, "thought: load the skill next").unwrap_err(), "the answer has no act");
+        assert!(toon.parse(&r, "just prose").unwrap_err().contains("no `key: value` lines"));
     }
 
     #[test]

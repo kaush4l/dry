@@ -1,0 +1,27 @@
+## Log
+
+- wiki Sherlock Holmes -> sources/wiki-sherlock-holmes.txt: creator Arthur Conan Doyle, first appeared 1887 A Study in Scarlet; has Personality and habits section to check for speech.
+- wiki A Study in Scarlet -> sources/wiki-a-study-in-scarlet.txt: published 1887 in Beeton's Christmas Annual.
+- search 'Sherlock Holmes speech style dialogue analysis' (duckduckgo): linguistics papers on Holmes's speech personality (vestnik-philology PDFs, researchgate, academia); reading the vestnik PDFs.
+- search 'A Study in Scarlet Beeton's Christmas Annual 1887 first publication' (duckduckgo): ACD Encyclopedia (21 Nov 1887), EBSCO research starter, bestofsherlock, wikisource; reading ACD Encyclopedia and EBSCO.
+- read arthur-conan-doyle.com/wiki/A_Study_in_Scarlet -> saved: first published in Beeton's Christmas Annual, 21 November 1887 (Ward, Lock & Co.); written March-April 1886, working title A Tangled Skein.
+- read ebsco.com research starter -> saved: created by Arthur Conan Doyle; first appearance A Study in Scarlet, Beeton's Christmas Annual, gives 1 December 1887 -> CONFLICT with ACD Encyclopedia (21 Nov 1887), note both.
+- read vestnik v48/part_1/28.pdf -> failed: PDF, not text. Taking other results.
+- read vestnik v52/part_1/26.pdf -> failed: PDF, not text. Taking other results.
+- grep wiki-sherlock-holmes for speech words: lines 316-324 'Elementary, my dear Watson' section (Holmes often calls conclusions 'elementary', occasionally says 'my dear Watson'; full phrase never in canon; Gillette 1899); line 201 deduction vs abduction.
+- search 'Sherlock Holmes manner of speaking Watson condescension deductions explained' (duckduckgo): mostly quizlet/scribd/quote sites; ACD Encyclopedia 'How Watson Learned the Trick' worth reading.
+- search 'Sherlock Holmes dialogue language style Conan Doyle literary analysis' (duckduckgo): Aston University paper (HTML page + PDF), Shmoop writing style, literariness analysis; reading those.
+- read research.aston.ac.uk abstract -> saved: Boucher & Perkins 2019, ELT 63(1) 77-98; about forensic linguistics in the canon, not Holmes's own speech style. Weak for speech traits.
+- read shmoop writing-style -> saved: Holmes 'the guy who talks the most'; contrasts his ordered, logical explanation ('two facts were very obvious to me... Obviously...') with other characters' slang. Lead for trait: step-by-step reasoning aloud, formal diction.
+- read literariness analysis -> saved: Adventures 1891-92 Strand; Holmes's character shifts from decadent to ascetic; to grep for speech.
+- read ACD Encyclopedia How Watson Learned the Trick -> saved: Holmes's ironic, teasing replies to Watson ('Dear me! How very clever!'); lead for trait: ironic/patronising address to Watson.
+- sed wiki-sherlock-holmes 150-215: Holmesian deduction section; Holmes explains inferences step by step ('It is simplicity itself...'), maxims ('capital mistake to theorize before one has data'; 'eliminated the impossible').
+- grep shmoop, literariness, ACD trick, aston for speech words: shmoop speaks to trait 1 (analytical step-by-step explanation, 'obvious/obviously', teaching Watson); ACD trick text lines 81-83 shows 'my dear Watson', 'my dear fellow', ironic tone (trait 3); literariness and aston say nothing on speech. Trait 2 (vocabulary/maxims) has only Wikipedia so far.
+- read britannica.com/topic/Sherlock-Holmes -> failed: HTTP 403, site refuses; not retried.
+- read ACD Encyclopedia Beeton's Christmas Annual -> saved: published November 1887 by Ward, Lock & Co.; third page on the date (agrees with month Nov, not 1 Dec).
+- search 'Sherlock Holmes characteristic speech mannerisms vocabulary canon' (duckduckgo): bakerstreet fandom canon analysis, researchgate speech-personality papers, academia; reading fandom and one researchgate page for trait 2.
+- read bakerstreet.fandom.com psychological analysis -> failed: HTTP 403; not retried.
+- read researchgate 359294347 speech personality -> failed: HTTP 403; not retried.
+- last round for trait 2: read ACD Encyclopedia Sherlock_Holmes page; search 'Holmes maxims aphorisms canon elementary singular diction Victorian'. After this, go to notes either way.
+- read arthur-conan-doyle.com/wiki/Sherlock_Holmes -> saved: created by Arthur Conan Doyle in 1887 (second page for creator); canon-sourced profile; grepping it for speech words as a possible second source for trait 2.
+- search 'Holmes maxims aphorisms canon "elementary" "singular" diction Victorian' -> failed: no results from duckduckgo, duckduckgo lite or wikipedia search. Two different searches gave no second page for trait 2; it stays thin unless the ACD Holmes page speaks to it. Moving to notes.

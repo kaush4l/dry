@@ -59,7 +59,7 @@ pub const DEFAULT_TEXT: &str = "Work on your goal (see your instructions), then 
 /// Most characters of a child's reply in a result or callback; all of it
 /// is in the engines artifact's snapshot (up to `SNAPSHOT_REPLY`).
 pub const REPLY_CHARS: usize = 400;
-pub const SNAPSHOT_REPLY: usize = 2_000;
+pub const SNAPSHOT_REPLY: usize = 4_000;
 
 /// How the shell sees an engine now.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -138,8 +138,12 @@ pub struct NewChild {
     /// From a template (`crate::kit`): its skills, its artifacts (roots
     /// set), its direct tools (`None`: the parent's) and its name.
     pub kit_skills: std::collections::BTreeMap<String, String>,
+    /// The tools those skills bring (`crate::skilltool`), by skill.
+    pub kit_skill_tools: std::collections::BTreeMap<String, String>,
     pub artifacts: std::collections::BTreeMap<String, String>,
     pub tools: Option<Vec<String>>,
+    /// The template's `elements.md`: the extra elements the child holds.
+    pub elements: String,
     pub from: Option<String>,
     /// What `model=` chose (`crate::subscriptions::Subscriptions::choose`):
     /// a model row for its inference, or a session row (the child is a
@@ -205,6 +209,9 @@ pub struct Line {
     /// `true`: `engine_call` (waits); `false`: `engine_start`.
     pub call: bool,
     pub seen: usize,
+    /// Its parent was told that its last turn failed (a fourth word,
+    /// `told`): a failure is told once, until the child works again.
+    pub told: bool,
 }
 
 /// An engines artifact's lines.
@@ -214,7 +221,8 @@ pub fn parse(text: &str) -> Vec<Line> {
             let mut w = l.trim().strip_prefix("child:")?.split_whitespace();
             let id = w.next()?.to_string();
             let call = w.next()? == "call";
-            Some(Line { id, call, seen: w.next().and_then(|n| n.parse().ok()).unwrap_or(0) })
+            let seen = w.next().and_then(|n| n.parse().ok()).unwrap_or(0);
+            Some(Line { id, call, seen, told: w.next() == Some("told") })
         })
         .collect()
 }
@@ -222,7 +230,8 @@ pub fn parse(text: &str) -> Vec<Line> {
 pub fn to_text(lines: &[Line]) -> String {
     let mut out = "kind: engines\n".to_string();
     for l in lines {
-        out.push_str(&format!("child: {} {} {}\n", l.id, if l.call { "call" } else { "start" }, l.seen));
+        let told = if l.told { " told" } else { "" };
+        out.push_str(&format!("child: {} {} {}{told}\n", l.id, if l.call { "call" } else { "start" }, l.seen));
     }
     out
 }
@@ -271,7 +280,9 @@ fn quote(text: &str, max: usize, artifact: &str) -> String {
     if n <= max {
         format!("\"{}\"", text.trim())
     } else {
-        format!("\"{}…\" ({n} characters; all of it is in the {artifact} artifact)", text.chars().take(max).collect::<String>().trim_end())
+        // Say only what the snapshot holds: past SNAPSHOT_REPLY it is cut too.
+        let held = if n <= SNAPSHOT_REPLY { "all of it is in the".to_string() } else { format!("the first {SNAPSHOT_REPLY} are in the") };
+        format!("\"{}…\" ({n} characters; {held} {artifact} artifact)", text.chars().take(max).collect::<String>().trim_end())
     }
 }
 
@@ -309,14 +320,25 @@ pub fn call(e: &mut Engine, artifact: &str, call: &Call, fam: &mut Family) -> Re
             if root.is_some_and(|r| r.contains('\n')) {
                 return Err("root is one folder: a path on one line".into());
             }
+            // In the browser's VM a root is a folder of the workspace: the
+            // workspace's full path (`/work`, as the environment line shows
+            // it) is written as that folder (`.`), so the child's artifacts
+            // read like any other and its files show in the workbench.
+            let in_vm = e.machine.0.environment.as_ref().is_some_and(|env| env.kind == crate::environment::Kind::BrowserVm);
+            let vm_root = match root {
+                Some(r) if in_vm => Some(crate::environment::vm::folder(r)?),
+                _ => None,
+            };
+            let root = vm_root.as_deref().or(root);
             // A template's name (`crate::kit`): the child is made from it.
             let kit = crate::kit::kits(e).remove(given);
-            let (template, kit_skills, artifacts, tools) = match &kit {
+            let kit_skill_tools = kit.as_ref().map(|k| k.skill_tools.clone()).unwrap_or_default();
+            let (template, kit_skills, artifacts, tools, elements) = match &kit {
                 Some(k) => {
                     if let Some(why) = k.problem() {
                         return Err(why);
                     }
-                    (k.template.clone(), k.skills.clone(), k.artifacts_at(root), k.tools.clone())
+                    (k.template.clone(), k.skills.clone(), k.artifacts_at(root), k.tools.clone(), k.elements.clone())
                 }
                 None if root.is_some() => {
                     return Err(format!(
@@ -326,7 +348,7 @@ pub fn call(e: &mut Engine, artifact: &str, call: &Call, fam: &mut Family) -> Re
                 }
                 None => {
                     crate::template::parse(given).map_err(|why| format!("the template does not read: {why}"))?;
-                    (given.to_string(), Default::default(), Default::default(), None)
+                    (given.to_string(), Default::default(), Default::default(), None, String::new())
                 }
             };
             let skills = list("skills");
@@ -340,10 +362,19 @@ pub fn call(e: &mut Engine, artifact: &str, call: &Call, fam: &mut Family) -> Re
             let model = choose(e, call.arg("model"))?.map(Box::new);
             let goal = crate::goal::write(goal, call.arg("scope").unwrap_or(""), call.arg("done").unwrap_or(""));
             let from = kit.map(|k| k.name);
-            (Some(NewChild { goal, template, skills, kinds, kit_skills, artifacts, tools, from, model }), false)
+            (Some(NewChild { goal, template, skills, kinds, kit_skills, kit_skill_tools, artifacts, tools, elements, from, model }), false)
         }
     };
-    let mut text = call.arg("text").map(str::trim).filter(|t| !t.is_empty()).unwrap_or(DEFAULT_TEXT).to_string();
+    // A new child's first message asks for the work, then gives what its
+    // parent wrote. The parent's text is context ("nothing exists yet; use
+    // the standard library"), and context alone is not an ask: a model
+    // that reads only that may answer nothing. A message to a child that
+    // exists is sent as written.
+    let mut text = match (call.arg("text").map(str::trim).filter(|t| !t.is_empty()), new.is_some()) {
+        (None, _) => DEFAULT_TEXT.to_string(),
+        (Some(given), true) => format!("{DEFAULT_TEXT}\n\n{given}"),
+        (Some(given), false) => given.to_string(),
+    };
     // A session's program reads no goal.md: its brief is its first message.
     if let Some(n) = new.as_ref().filter(|n| matches!(n.model.as_deref(), Some(crate::subscriptions::Choice::Session { .. }))) {
         text = format!("{}\n\n{text}", n.goal.trim());
@@ -354,8 +385,8 @@ pub fn call(e: &mut Engine, artifact: &str, call: &Call, fam: &mut Family) -> Re
     let mut lines = parse(state);
     let seen = child.as_ref().map_or(0, |c| c.replies);
     match lines.iter_mut().find(|l| l.id == id) {
-        Some(l) => *l = Line { id: id.clone(), call: wait, seen },
-        None => lines.push(Line { id: id.clone(), call: wait, seen }),
+        Some(l) => *l = Line { id: id.clone(), call: wait, seen, told: false },
+        None => lines.push(Line { id: id.clone(), call: wait, seen, told: false }),
     }
     *state = to_text(&lines);
     let made = new.is_some();
@@ -407,9 +438,15 @@ fn make(state: &mut State, parent: usize, ask: &Ask, new: &NewChild) -> usize {
     c.machine = p.machine.clone();
     c.template = new.template.clone();
     c.skills = new.kit_skills.clone();
+    c.skill_tools = new.kit_skill_tools.clone();
+    c.elements = new.elements.clone();
     for s in &new.skills {
         if let Some(text) = p.skills.get(s) {
             c.skills.insert(s.clone(), text.clone());
+        }
+        // A skill handed down keeps the tools it brings.
+        if let Some(text) = p.skill_tools.get(s) {
+            c.skill_tools.insert(s.clone(), text.clone());
         }
     }
     match new.model.as_deref() {
@@ -503,6 +540,11 @@ pub fn settle(state: &mut State, parent: usize, seen: &dyn Fn(usize) -> Seen) ->
         for line in &mut lines {
             let Some(c) = state.index_of(&line.id) else { continue };
             let now = seen(c);
+            // It works again (or works now): a later failure is news.
+            if line.told && (now.busy || now.failed.is_none()) {
+                line.told = false;
+                changed = true;
+            }
             if now.busy {
                 continue;
             }
@@ -517,7 +559,12 @@ pub fn settle(state: &mut State, parent: usize, seen: &dyn Fn(usize) -> Seen) ->
                 changed = true;
                 let reply = replies.last().expect("more than seen");
                 Ok(format!("{} replied: {}", line.id, quote(reply, REPLY_CHARS, &artifact)))
-            } else if let (true, Some(why)) = (waits, now.failed) {
+            } else if let (false, Some(why)) = (line.told, now.failed) {
+                // A failed child calls back once, as a reply does: a
+                // parent that did not wait hears it too.
+                line.told = true;
+                changed = true;
+                let why = if why.chars().count() > REPLY_CHARS { format!("{}…", why.chars().take(REPLY_CHARS).collect::<String>()) } else { why };
                 Err(format!("error: {} failed: {why}", line.id))
             } else {
                 continue;
@@ -531,7 +578,11 @@ pub fn settle(state: &mut State, parent: usize, seen: &dyn Fn(usize) -> Seen) ->
                 }
                 p.waiting.retain(|w| *w != line.id);
                 answered = true;
-            } else if let Ok(text) = result {
+            } else {
+                let text = match result {
+                    Ok(text) => text,
+                    Err(e) => e.trim_start_matches("error: ").to_string(),
+                };
                 out.wake.push(format!("engine {text} (engines {artifact})"));
             }
         }
@@ -716,20 +767,23 @@ mod tests {
     fn a_child_made_from_a_template_gets_its_phases_tools_skills_and_artifacts_at_the_root() {
         let mut s = crate::shipped::state().unwrap();
         s.add_text(0, "make the greeting use a comma in /tmp/hello");
-        assert!(prompt(&s, 0).contains("- developer: Changes code"), "the translator sees what it can make");
+        assert!(prompt(&s, 0).contains("- developer: Makes or changes code"), "the translator sees what it can make");
         let (_, applied) = step(
             &mut s,
             0,
-            "engine_start(name=\"dev-greeting\", goal=\"The greeting has a comma.\", done=\"Tests pass.\", template=\"developer\", root=\"/tmp/hello\")",
+            "engine_start(name=\"dev-greeting\", goal=\"The greeting has a comma.\", done=\"Tests pass.\", text=\"Start from greet.ts.\", template=\"developer\", root=\"/tmp/hello\")",
         );
         assert!(last(&s, 0).contains("made dev-greeting from template developer"), "{}", last(&s, 0));
         let c = &s.engines[applied.run[0]];
         assert_eq!(c.parent.as_deref(), Some("translator"));
+        assert_eq!(c.messages[0].text, format!("{DEFAULT_TEXT}\n\nStart from greet.ts."), "its first message asks for the work, then gives the parent's text");
         assert_eq!(c.tools, ["reply", "write", "read", "list"], "the template's tools, not the translator's");
         assert!(c.skills.contains_key("triage") && !c.skills.contains_key("prompting"), "its own skills only");
         assert_eq!(c.phase_list().unwrap().iter().map(|p| p.name.as_str()).collect::<Vec<_>>(), ["triage", "code", "test"]);
         assert!(c.artifacts["code"].contains("root: /tmp/hello") && c.artifacts["terminal"].contains("root: /tmp/hello"));
         assert!(c.artifacts.contains_key("notes") && c.artifacts.contains_key("shared"));
+        assert_eq!(c.elements.trim(), "environment", "the template's elements.md: it reads where its tools run");
+        assert!(c.skill_tools.contains_key("python") && !c.skill_tools.contains_key("triage"), "a skill's own tools come with it");
         // root= without a template's name is refused, so it never moves a root by accident.
         step(&mut s, 0, "engine_start(name=\"other\", goal=\"x\", root=\"/tmp\")");
         assert!(last(&s, 0).contains("root= goes with a template's name"), "{}", last(&s, 0));
@@ -910,6 +964,28 @@ mod tests {
         let failed = |j: usize| Seen { failed: (j == 1).then(|| "no model".to_string()), ..Seen::default() };
         assert!(settle(&mut s, 0, &failed).resumed);
         assert!(last(&s, 0).ends_with("→ error: h failed: no model"), "{}", last(&s, 0));
+        assert!(settle(&mut s, 0, &failed).wake.is_empty(), "told once, in the wait");
+    }
+
+    #[test]
+    fn a_cut_reply_says_how_much_of_it_the_snapshot_holds() {
+        let long = "x".repeat(SNAPSHOT_REPLY + 10);
+        assert!(quote(&long, REPLY_CHARS, "kids").ends_with(&format!("({} characters; the first {SNAPSHOT_REPLY} are in the kids artifact)", SNAPSHOT_REPLY + 10)));
+        assert!(quote(&"y".repeat(500), REPLY_CHARS, "kids").ends_with("(500 characters; all of it is in the kids artifact)"));
+    }
+
+    #[test]
+    fn a_started_child_that_fails_calls_back_once_and_again_after_it_worked() {
+        let mut s = parent();
+        s.add_text(0, "go");
+        step(&mut s, 0, "engine_start(name=\"h\", goal=\"G.\")");
+        let failed = |j: usize| Seen { failed: (j == 1).then(|| "no model".to_string()), ..Seen::default() };
+        assert_eq!(settle(&mut s, 0, &failed).wake, ["engine h failed: no model (engines kids)"]);
+        assert!(settle(&mut s, 0, &failed).wake.is_empty(), "a failure is told once");
+        assert!(s.engines[0].artifacts["kids"].contains("child: h start 0 told"), "{}", s.engines[0].artifacts["kids"]);
+        let busy = |j: usize| Seen { busy: j == 1, ..Seen::default() };
+        assert!(settle(&mut s, 0, &busy).wake.is_empty());
+        assert_eq!(settle(&mut s, 0, &failed).wake, ["engine h failed: no model (engines kids)"], "it worked again, so a new failure is news");
     }
 
     #[test]

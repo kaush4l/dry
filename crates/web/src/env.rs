@@ -225,6 +225,13 @@ fn not_ready() -> Option<String> {
 
 /// The 2 s tick (the app's `settle`): the tails of running jobs, the
 /// last tail of ended ones, and the save rule.
+/// Is a command started in the VM still running (a `start` or a
+/// `background`)? While one is, a live view on screen is drawn again on
+/// the tick so its output moves.
+pub fn running() -> bool {
+    with(|e| e.sessions.values().any(|s| s.job.is_some() && s.end.is_none()))
+}
+
 pub fn tick() {
     if not_ready().is_some() {
         return;
@@ -343,7 +350,7 @@ pub async fn run(job: &RunJob) -> Result<(Option<i32>, String), String> {
                 s.last_read = true;
             }
         });
-        (Some(o.code), last_lines(&o.text, RESULT_LINES))
+        (Some(o.code), last_lines(&o.text, RESULT_LINES + 1))
     });
     if came.is_err() {
         with(|e| e.sessions.entry(key.clone()).or_default().end = Some(None));

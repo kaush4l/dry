@@ -59,6 +59,28 @@ impl Disk {
         Ok(real)
     }
 
+    /// Where a new file `path` goes under `root`: its folders made, none of
+    /// them a link that leads outside the root.
+    fn new_inside(&self, root: &str, path: &str) -> Result<PathBuf, String> {
+        let root = self.root(root)?;
+        let full = root.join(path);
+        if full.exists() {
+            // It is there, so `inside` refused it for a reason (a link out).
+            return Err(format!("{path} leads outside the root (a link)"));
+        }
+        let dir = full.parent().ok_or_else(|| format!("{path}: no folder to put it in"))?;
+        // The deepest folder that exists already decides: made folders can only be inside it.
+        let mut have = dir;
+        while !have.exists() {
+            have = have.parent().ok_or_else(|| format!("{path}: no folder to put it in"))?;
+        }
+        if !have.canonicalize().map_err(|e| format!("{path}: {e}"))?.starts_with(&root) {
+            return Err(format!("{path} leads outside the root (a link)"));
+        }
+        fs::create_dir_all(dir).map_err(|e| format!("{path}: {e}"))?;
+        Ok(full)
+    }
+
     /// `<session>.<ext>` in the job's log folder.
     fn file(&self, job: &Job, ext: &str) -> PathBuf {
         self.engines.join(job.engine).join(dry_core::files::ARTIFACTS).join(job.artifact).join(format!("{}.{ext}", job.session))
@@ -117,6 +139,15 @@ fn parse_offset(z: &str) -> Option<i32> {
 }
 
 impl Host for Disk {
+    fn clock(&self) -> dry_core::live::Clock {
+        clock()
+    }
+
+    fn make_root(&self, root: &str) -> Result<(), String> {
+        let dir = if Path::new(root).is_absolute() { PathBuf::from(root) } else { self.repo.join(root) };
+        std::fs::create_dir_all(&dir).map_err(|e| e.to_string())
+    }
+
     fn now(&self) -> i64 {
         std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs() as i64)
     }
@@ -184,7 +215,12 @@ impl Host for Disk {
     fn write(&self, root: &str, path: &str, text: &str) -> Result<(), String> {
         // In place, so the file keeps its permissions (a script stays
         // executable) and no temp file lands in the person's folder.
-        let real = self.inside(root, path)?;
+        let real = match self.inside(root, path) {
+            Ok(real) => real,
+            // Not there yet (a file made with `edit`): its folders are
+            // made, and the nearest one that exists must be inside the root.
+            Err(_) => self.new_inside(root, path)?,
+        };
         fs::write(&real, text).map_err(|e| format!("{path}: {e}"))
     }
 
@@ -331,6 +367,13 @@ mod tests {
         disk.write(".", "top.md", "# changed\n").unwrap();
         assert_eq!(fs::read_to_string(dir.join("repo/top.md")).unwrap(), "# changed\n");
         assert_eq!(fs::read_to_string(dir.join("outside.txt")).unwrap(), "no");
+        // A new file (made with `edit`) is written with its folders, inside the root only.
+        disk.write(".", "pkg/new/tree.py", "print(1)\n").unwrap();
+        assert_eq!(fs::read_to_string(dir.join("repo/pkg/new/tree.py")).unwrap(), "print(1)\n");
+        fs::create_dir_all(dir.join("elsewhere")).unwrap();
+        std::os::unix::fs::symlink(dir.join("elsewhere"), dir.join("repo/out")).unwrap();
+        assert!(disk.write(".", "out/deep/new.txt", "x").unwrap_err().contains("outside the root"));
+        assert!(!dir.join("elsewhere/deep").exists(), "nothing is made outside the root");
         let _ = fs::remove_dir_all(&dir);
     }
 

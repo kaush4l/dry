@@ -699,6 +699,37 @@ over the whole history:
 
 Other kinds: clock, scripts, alerts (built).
 
+### `kind: alerts` — what wakes an engine by itself (built: `core/alert.rs`; firing 2026-11-23)
+
+An alert is a file (`spec/alerts/<name>.md`: `trigger:` `at 09:35`,
+`at 09:35 weekdays`, `at 2026-11-24 09:35` or `every 30m`; `once:`; the
+body is the message). The artifact shows each on one line with how often
+it has fired, and brings one tool:
+
+```text
+alert(name="check-build", trigger="every 30m", text="Look at the build; tell the person only if it broke.")
+alert(name="check-build", text="")          removes it
+```
+
+- **Firing** is in the one path every shell already ticks for callbacks
+  (`turn::callbacks` → `alert::settle`, with the host's wall clock,
+  `Host::clock`): an alert that is due wakes its engine as a child's reply
+  does, with `Alert check-build fired (every 30m): …` as the message of a
+  new turn. Nobody writes to it. It works the same on the host, in the
+  window and in the browser page (while the page is open).
+- **The rules** are the old project's: an alert never fires at the moment
+  it is made; a moment nobody looked at within 120 s is missed, said in
+  the snapshot, never fired late; an engine in a turn is looked at when
+  the turn ends. `once: true` and a dated `at` are removed when they fire.
+  At most 8 alerts an engine.
+- When each was first seen and last fired is kept in `convo/run.md`
+  (`alert: <name> <created> <last> <fired> <missed>`), so a restart does
+  not fire a moment twice.
+- The shipped translator holds one alerts artifact; its goal says when to
+  set one (docs/default.md §2). Tests: `alert::tests`,
+  `turn::tests::an_engine_sets_its_own_alert_and_is_woken_by_it_with_nobody_writing`.
+
+
 ## 4b. Skills: instructions with metadata and tools
 
 A skill is the standard `SKILL.md` (a `---` header with `name`,
@@ -715,6 +746,41 @@ command names any other files it leaves behind). It is an element:
   creates or updates one, for an engine whose tools list it.
 - **per phase:** `a, b` in a phase's `skills` column limits what that phase
   sees; without it, every skill.
+
+**A skill can bring tools of its own** (built 2026-11-23,
+`core/skilltool.rs`). Its `tools:` line only names tools that exist
+already. Tools nobody else has go in `tools.md` beside `SKILL.md`, written
+as a declared capability's tools are ([capabilities.md](capabilities.md)):
+
+```markdown
+spec/skills/python/tools.md
+# python
+Check, run and test Python files in the project's root.
+
+## tool: check
+Compile one Python file without running it.
+command: ["python3", "-m", "py_compile", "{file}"]
+inputs:
+- file (string, required): the file, relative to the root
+```
+
+- The heading is the skill's name. While the skill is loaded each tool is
+  the engine's, called `<skill>.<tool>` (`python.check(file="tree.py")`),
+  listed in the tools slot with its inputs, and named in what `skill(name)`
+  gives back. It goes with the skill at the next message.
+- **A skill tool is a command in the engine's terminal.** The call is
+  checked against the inputs, becomes the command with each input as one
+  whole quoted argument (never shell text), and runs as a `run` of the
+  terminal artifact: in the project's root, with a session, its exit code
+  and last lines as the result. So it works wherever a terminal does (a
+  host, a companion's folder, the browser's VM). An engine with no terminal
+  artifact is told so.
+- A template carries them too (`templates/<t>/skills/<s>/tools.md`), and a
+  child made from it gets them. A file whose heading is not the skill's
+  name, or that does not read, brings nothing and says why.
+- The first shipped one is the developer's `python` skill (`check`, `run`,
+  `test`). Tests: `skilltool::tests`,
+  `turn::tests::a_loaded_skills_own_tool_runs_in_the_terminal_and_is_gone_with_the_skill`.
 
 ## 4c. Engine settings: model and sampling
 
