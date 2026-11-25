@@ -89,6 +89,16 @@ pub fn clean_endpoint(e: &str) -> String {
     if has_path { e.to_string() } else { format!("{e}/v1") }
 }
 
+/// What a redraw puts back in a Settings → Models field: the text
+/// `typed` in it, but only while the app draws the same value as before
+/// (`drawn_before`, `drawn_now`: the field's `value` attribute, `None`
+/// for the key, which is never drawn). A value the app changed since (a
+/// model picked from the list, the first one Detect took) is shown as
+/// drawn, so Save does not put the old text back over it.
+pub fn kept_field<'a>(typed: &'a str, drawn_before: Option<&str>, drawn_now: Option<&str>) -> Option<&'a str> {
+    (drawn_before == drawn_now).then_some(typed)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -103,5 +113,20 @@ mod tests {
         let ai = s.inference();
         assert_eq!((ai.base_url.as_str(), ai.model.as_str(), ai.key_env), (DEFAULT_ENDPOINT, "m", None));
         assert!(dry_core::models::Models::from_json(&s.models_json()).is_ok());
+    }
+
+    /// A redraw keeps what was typed in a field only while the app still
+    /// draws the value it drew before; a value the app changed (a picked
+    /// model, the first one Detect took) is shown, not typed over.
+    #[test]
+    fn a_redraw_keeps_typed_text_but_shows_a_value_the_app_changed() {
+        // Typing an endpoint, then Detect: nothing saved yet, the text stays.
+        assert_eq!(kept_field("http://other:1/v1", Some("http://localhost:1234/v1"), Some("http://localhost:1234/v1")), Some("http://other:1/v1"));
+        // A model picked from the list: the field shows it, not the old text.
+        assert_eq!(kept_field("model-a", Some("model-a"), Some("model-b")), None);
+        // Detect took the first model while the field was empty.
+        assert_eq!(kept_field("", Some(""), Some("model-a")), None);
+        // The key field is never drawn back: what was typed stays.
+        assert_eq!(kept_field("sk-typed", None, None), Some("sk-typed"));
     }
 }

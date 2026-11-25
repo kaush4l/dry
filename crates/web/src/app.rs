@@ -613,11 +613,13 @@ fn render() {
         .into_iter()
         .filter_map(|e| Some((e.get_attribute("data-keep")?, e.dyn_into::<HtmlTextAreaElement>().ok()?.value())))
         .collect();
-    let fields: Vec<(String, String)> = all("#connection input[name]")
+    // Each Settings → Models field: its name, what is typed in it, and the
+    // value the app drew it with (`settings::kept_field`).
+    let fields: Vec<(String, String, Option<String>)> = all("#connection input[name]")
         .into_iter()
         .filter_map(|e| {
             let i = e.dyn_into::<HtmlInputElement>().ok()?;
-            Some((i.name(), i.value()))
+            Some((i.name(), i.value(), i.get_attribute("value")))
         })
         .collect();
     let focused =
@@ -697,7 +699,8 @@ fn render() {
     }
     for e in all("#connection input[name]") {
         if let Ok(i) = e.dyn_into::<HtmlInputElement>()
-            && let Some((_, v)) = fields.iter().find(|(n, _)| *n == i.name())
+            && let Some((_, typed, drawn)) = fields.iter().find(|(n, _, _)| *n == i.name())
+            && let Some(v) = settings::kept_field(typed, drawn.as_deref(), i.get_attribute("value").as_deref())
         {
             i.set_value(v);
         }
