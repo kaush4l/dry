@@ -28,10 +28,10 @@ and marks the one in force; `dry scene use abyss` (or `none`) and
 
 The cat is the one from dry (`app/eggs/pet/egg.js`), with the same body,
 the same states, the same constants and the same physics. Everything is
-in CSS pixels, so `scenes/cat.md` says `cell 1`. Its body is made of parts:
+in CSS pixels, so `scenes/cat/scene.md` says `cell 1`. Its body is made of parts:
 legs, tail, body, ears and head. Each part is drawn twice, first fattened
 in the outline colour and then filled, so the cat gets one sticker
-outline. The part list is in `scenes/cat.md` under "Body".
+outline. The part list is in `scenes/cat/scene.md` under "Body".
 
 | Trick | What it does (egg.js's numbers) |
 |---|---|
@@ -157,7 +157,30 @@ about 25% opacity, and `terminal` keeps it almost clear.
 
 ## A scene file
 
-`scenes/<name>.md` is data:
+A scene is a folder, `scenes/<name>/`, like a theme (`themes/<name>/`):
+its main file `scene.md` and any text files beside it. Both kinds share
+one set of tools (`dry_core::look`, `dry_tools::looks`):
+
+| | command line | engines (app tool `look`) | settings page (host) |
+|---|---|---|---|
+| list | `dry themes`, `dry scenes` | `list what=themes\|scenes` | the THEME and SCENE rows |
+| use | `dry theme use <n>`, `dry scene use <n>\|none` | `do=use` | a click (app.md `theme:` / `scene:`) |
+| read | `dry theme\|scene show <n>` | `do=show` | |
+| add | `dry theme\|scene new <n> [--from <m>]` | `do=new` | Copy |
+| edit | `dry theme\|scene set <n> <key> <value> [light\|dark]` | `do=set` | (UI tokens page, for themes) |
+| remove | `dry theme\|scene rm <n>` | `do=rm` | Remove… |
+| share | `dry theme\|scene export <n> [<file>]`, `… import <file> [--replace]` | `do=export`, `do=import` | Export (a download), Import… |
+
+A theme's `set` key is a token; a scene's is a `## Scene` row (`kind`,
+`place`, `fps`, `cell`, `pixel`) or a `## Palette` key. Every change is
+read back before it is written, so a broken file is refused, not saved.
+Remove is refused for the one in use and for the `default` theme.
+
+The shared file is markdown: `# dry scene: <name>`, then each file of
+the folder as `## <path>` over a `~~~` fence. Paths stay inside the
+folder (no `..`, no hidden files).
+
+`scene.md` is data:
 
 - **`## Scene`** rows:
   - `kind`: `cat`, `terminal` or `abyss`, the behaviour that moves it;

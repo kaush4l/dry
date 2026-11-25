@@ -190,6 +190,9 @@ impl Engine {
 pub struct State {
     /// Light or dark: the theme mode the whole UI is drawn in.
     pub mode: Mode,
+    /// The theme setting (`app.md`'s `theme:`, a folder in `themes/`);
+    /// None when app.md does not say (the shipped default's, else `default`).
+    pub theme: Option<String>,
     /// The scene setting (`app.md`'s `scene:`; `none` for none); None when
     /// app.md does not say (`crate::scene::settings` then goes on down).
     pub scene: Option<String>,

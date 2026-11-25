@@ -48,6 +48,7 @@ pub fn world(host: Option<&crate::host::Host>) -> World {
         .map_err(|e| format!("cannot read models.json: {e}"))
         .and_then(|t| Models::from_json(&t).map_err(|e| format!("models.json does not parse: {e}")));
     let themes = dry_tools::list_themes();
+    let active_theme = dry_tools::active_theme_in(&state);
     let disk = dry_tools::live::Disk::for_store(&store);
     if host.is_none() {
         // No host: the logs as the window (or the last host) left them.
@@ -65,11 +66,11 @@ pub fn world(host: Option<&crate::host::Host>) -> World {
         state,
         store,
         store_error,
-        theme: dry_tools::read_theme(),
+        theme: dry_tools::read_theme_named(&active_theme),
         local_theme: dry_tools::read_local_theme().ok().flatten(),
         named_themes: themes.iter().map(|n| (n.clone(), dry_tools::read_theme_named(n))).collect(),
         themes,
-        active_theme: dry_tools::active_theme(),
+        active_theme,
         scenes: dry_tools::list_scenes().into_iter().map(|n| (n.clone(), dry_tools::read_scene(&n))).collect(),
         models,
         sessions,

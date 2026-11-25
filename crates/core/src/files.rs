@@ -266,11 +266,14 @@ pub fn apply_meta(e: &mut Engine, json: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// `app.md`: the app's settings (the mode; the scene and the motion
-/// when set) and the engines' ids, in order; a child engine says which
+/// `app.md`: the app's settings (the mode; the theme, the scene and the
+/// motion when set) and the engines' ids, in order; a child engine says which
 /// made it: `- helper (child of engine-1)`.
 pub fn app_md(state: &State) -> String {
     let mut out = format!("mode: {}\n", state.mode.as_str());
+    if let Some(theme) = &state.theme {
+        out.push_str(&format!("theme: {theme}\n"));
+    }
     if let Some(scene) = &state.scene {
         out.push_str(&format!("scene: {scene}\n"));
     }
@@ -302,13 +305,21 @@ pub fn parse_app(md: &str) -> (Mode, Vec<(String, Option<String>)>) {
     (mode, ids)
 }
 
-/// `app_md`'s scene and motion settings, each None when it does not say
-/// (or says something that is not a scene name or a number of seconds).
-pub fn parse_settings(md: &str) -> (Option<String>, Option<f32>) {
+/// `app_md`'s look settings, each None when it does not say (or says
+/// something that is not a folder name or a number of seconds).
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Settings {
+    pub theme: Option<String>,
+    pub scene: Option<String>,
+    pub motion: Option<f32>,
+}
+
+/// Read `app_md`'s settings (`Settings`).
+pub fn parse_settings(md: &str) -> Settings {
     let value = |key: &str| md.lines().take_while(|l| l.trim() != "engines:").find_map(|l| l.strip_prefix(key)?.strip_prefix(':').map(str::trim));
-    let scene = value("scene").filter(|s| crate::theme::valid_scene_name(s)).map(str::to_string);
+    let name = |key: &str| value(key).filter(|s| crate::look::valid_name(s)).map(str::to_string);
     let motion = value("motion").and_then(|m| m.parse::<f32>().ok()).filter(|m| *m >= 0.0);
-    (scene, motion)
+    Settings { theme: name("theme"), scene: name("scene"), motion }
 }
 
 /// A folder name for `name`: lower case letters, digits and `-`, not one
@@ -491,12 +502,12 @@ mod tests {
         }
         let (mode, ids) = parse_app(&app_md(&state));
         assert_eq!(mode, Mode::Light);
-        assert_eq!(parse_settings(&app_md(&state)), (None, None), "no scene line until one is set");
+        assert_eq!(parse_settings(&app_md(&state)), Settings::default(), "no setting line until one is set");
         let mut set = state.clone();
-        (set.scene, set.motion) = (Some("none".into()), Some(0.0));
-        assert_eq!(parse_settings(&app_md(&set)), (Some("none".into()), Some(0.0)));
-        assert!(app_md(&set).starts_with("mode: light\nscene: none\nmotion: 0\n\nengines:\n"), "{}", app_md(&set));
-        assert_eq!(parse_settings("scene: ../x\nmotion: fast\n"), (None, None));
+        (set.theme, set.scene, set.motion) = (Some("bolt".into()), Some("none".into()), Some(0.0));
+        assert_eq!(parse_settings(&app_md(&set)), Settings { theme: Some("bolt".into()), scene: Some("none".into()), motion: Some(0.0) });
+        assert!(app_md(&set).starts_with("mode: light\ntheme: bolt\nscene: none\nmotion: 0\n\nengines:\n"), "{}", app_md(&set));
+        assert_eq!(parse_settings("theme: a/b\nscene: ../x\nmotion: fast\n"), Settings::default());
         let ids: Vec<(&str, Option<&str>)> = ids.iter().map(|(i, p)| (i.as_str(), p.as_deref())).collect();
         assert_eq!(ids, [("engine-1", None), ("claude-2", None), ("helper", Some("engine-1"))]);
         assert!(app_md(&state).contains("- helper (child of engine-1)\n"));

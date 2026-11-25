@@ -201,7 +201,7 @@ mod tests {
     }
 
     fn theme() -> theme::Theme {
-        theme::Theme::from_md(include_str!("../../../themes/default.md")).unwrap()
+        theme::Theme::from_md(include_str!("../../../themes/default/theme.md")).unwrap()
     }
 
     #[test]
@@ -236,7 +236,7 @@ mod tests {
 
     #[test]
     fn the_scenes_colours_are_resolved_per_mode() {
-        let cat = Scene::from_md("cat", include_str!("../../../scenes/cat.md")).unwrap();
+        let cat = Scene::from_md("cat", include_str!("../../../scenes/cat/scene.md")).unwrap();
         let t = theme();
         let css = scene(&cat, &theme::resolve(Mode::Light, &t), &theme::resolve(Mode::Dark, &t));
         let light = css.split(":root[data-mode=light]").nth(1).unwrap().split('}').next().unwrap();

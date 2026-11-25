@@ -32,6 +32,7 @@ pub mod inspect;
 pub mod jev;
 pub mod kit;
 pub mod layout;
+pub mod look;
 pub mod learning;
 pub mod live;
 pub mod liveview;

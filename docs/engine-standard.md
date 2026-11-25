@@ -480,8 +480,8 @@ What the files on disk are now, and which ones the engine has open.
 - **Tools** (exist only while the artifact does; with two artifacts of a
   kind, a call names one with `artifact="..."`). Results are one line:
   - `open(path)` → `opened crates/core/src/turn.rs (412 lines)`. At most
-    8 files open; a ninth closes the oldest without unsaved edits
-    (`…; closed a.rs (8 open at most)`).
+    32 files open; one more closes the oldest without unsaved edits
+    (`…; closed a.rs (32 open at most)`).
   - `focus(path, from, to)` → `focus turn.rs 40-90 (412 lines)`: show only
     those lines (opens the file if needed).
   - `edit(path, old, new)` → `edited turn.rs (unsaved: 1 edit; save(path="turn.rs") writes it)`.

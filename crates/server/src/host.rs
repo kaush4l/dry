@@ -1576,13 +1576,33 @@ impl Host {
     /// turn it off. A machine's local.md `## Scene` row still beats it.
     pub fn set_scene(&self, value: &str) -> Result<u64, Refused> {
         let value = value.trim();
-        if value != dry_core::theme::NO_SCENE && !dry_tools::scenes_dir().join(format!("{value}.md")).is_file() {
+        if value != dry_core::theme::NO_SCENE && dry_tools::looks::exists(dry_core::look::Kind::Scene, value).is_err() {
             return Err(refuse(400, format!("no scene {value} in scenes/")));
         }
         let mut g = self.lock();
         Host::writable(&g)?;
         g.state.scene = Some(value.to_string());
         Ok(self.commit(&mut g))
+    }
+
+    /// The app's theme (app.md `theme:`): a folder in themes/.
+    pub fn set_theme(&self, value: &str) -> Result<u64, Refused> {
+        let value = value.trim();
+        dry_tools::looks::exists(dry_core::look::Kind::Theme, value).map_err(|e| refuse(400, e))?;
+        let mut g = self.lock();
+        Host::writable(&g)?;
+        g.state.theme = Some(value.to_string());
+        Ok(self.commit(&mut g))
+    }
+
+    /// The looks the app uses now, which removing is refused for: the
+    /// active theme, and the scene app.md names.
+    pub fn looks_in_use(&self, kind: dry_core::look::Kind) -> Vec<String> {
+        let g = self.lock();
+        match kind {
+            dry_core::look::Kind::Theme => vec![dry_tools::active_theme_in(&g.state)],
+            dry_core::look::Kind::Scene => g.state.scene.iter().cloned().collect(),
+        }
     }
 
     pub fn set_mode(&self, value: &str) -> Result<u64, Refused> {

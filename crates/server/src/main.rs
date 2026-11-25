@@ -451,6 +451,19 @@ async fn scene(req: HttpRequest, s: Data, body: web::Bytes) -> HttpResponse {
     }
 }
 
+async fn theme(req: HttpRequest, s: Data, body: web::Bytes) -> HttpResponse {
+    let (host, v) = match intent(&req, &s, &body) {
+        Ok(x) => x,
+        Err(no) => return no.response(),
+    };
+    let value = v.get("value").and_then(Value::as_str).unwrap_or_default().to_string();
+    match web::block(move || host.set_theme(&value)).await {
+        Ok(Ok(g)) => reply(200, json!({ "gen": g })),
+        Ok(Err(r)) => refused(r, &s.live),
+        Err(e) => error(500, e.to_string()),
+    }
+}
+
 async fn mode(req: HttpRequest, s: Data, body: web::Bytes) -> HttpResponse {
     let (host, v) = match intent(&req, &s, &body) {
         Ok(x) => x,
@@ -784,6 +797,7 @@ async fn main() -> std::io::Result<()> {
             .route("/api/engines/{id}/format", web::post().to(format))
             .route("/api/mode", web::post().to(mode))
             .route("/api/scene", web::post().to(scene))
+            .route("/api/theme", web::post().to(theme))
             .route("/api/reset", web::post().to(reset))
             .route("/api/engines/{id}/read", web::get().to(read))
             .route("/api/engines/{id}/evidence/{artifact}/{file}", web::get().to(evidence_image))

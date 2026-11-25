@@ -9,7 +9,7 @@
   "models": [
     {
       "name": "local",
-      "id": "openai/c/inkling-2-mini-oq4e-mtp",
+      "id": "openai/c/inkling-2-mini-26b-heretic-uncensored-turbo-brilliance-50x-v2-agi-neo",
       "base_url": "http://127.0.0.1:1234/v1"
     },
     {

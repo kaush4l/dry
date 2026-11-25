@@ -266,7 +266,7 @@ mod tests {
 
     #[test]
     fn the_module_draws_what_the_core_draws() {
-        let text = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../scenes/cat.md")).unwrap();
+        let text = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../scenes/cat/scene.md")).unwrap();
         assert_eq!(load(&text), 1);
         let n = scene_palette();
         // SAFETY: `scene_text` points at `n` bytes.

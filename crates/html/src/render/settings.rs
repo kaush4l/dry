@@ -258,6 +258,38 @@ pub fn reset_history(out: &mut String, cx: &Ctx) {
     });
 }
 
+/// Under a kind's choices: copy or export the one chosen (`name`), remove
+/// one not in use, or import a shared one: each a folder
+/// (`dry_core::look`), written by the host. Export is a download of the
+/// folder as one file.
+fn looks_row(out: &mut String, cx: &Ctx, kind: dry_core::look::Kind, name: Option<&str>) {
+    let w = kind.word();
+    let _ = write!(out, "<div class=\"row\">");
+    if let Some(name) = name {
+        let value = format!("{w}:{name}");
+        out.push_str(&cx.act(&format!("Copy {name}"), "", &format!("data-act=\"look-new\" data-value=\"{}\"", esc(&value))));
+        if cx.world.hosted() {
+            let href = format!("/api/looks/{w}/{}/export", super::encode(name));
+            let _ = write!(out, "<a class=\"btn\" href=\"{}\" download>Export {}</a>", esc(&href), esc(name));
+        } else {
+            out.push_str(&cx.off(&format!("Export {name}"), ""));
+        }
+    }
+    // Removable: not the one chosen, and never the default theme.
+    let all: Vec<String> = match kind {
+        dry_core::look::Kind::Theme => cx.world.themes.clone(),
+        dry_core::look::Kind::Scene => cx.world.scenes.keys().cloned().collect(),
+    };
+    let spare: Vec<&str> =
+        all.iter().map(String::as_str).filter(|n| Some(*n) != name && !(kind == dry_core::look::Kind::Theme && *n == "default")).collect();
+    if !spare.is_empty() {
+        let value = format!("{w}:{}", spare.join(","));
+        out.push_str(&cx.act("Remove…", "", &format!("data-act=\"look-rm\" data-value=\"{}\"", esc(&value))));
+    }
+    out.push_str(&cx.act(&format!("Import a {w}…"), "", &format!("data-act=\"look-import\" data-value=\"{w}\"")));
+    let _ = write!(out, "</div>");
+}
+
 /// `appearance`: Light / Dark and the themes. Each is a preview here: a
 /// link that shows the page that way; the desktop app saves a choice.
 pub fn appearance(out: &mut String, cx: &Ctx) {
@@ -290,9 +322,11 @@ pub fn appearance(out: &mut String, cx: &Ctx) {
             let _ = write!(out, "<a class=\"btn {class}\" href=\"{}\">{}</a>", esc(&link(mode, name)), esc(name));
         }
     }
+    let _ = write!(out, "</div>");
+    looks_row(out, cx, dry_core::look::Kind::Theme, Some(theme.as_str()));
     // The scene: its own thing, not part of a theme (any theme shows any
     // scene, or none). Saved as app.md's `scene:`.
-    let _ = write!(out, "</div>{}<div class=\"row\">", section("SCENE · scenes/"));
+    let _ = write!(out, "{}<div class=\"row\">", section("SCENE · scenes/"));
     let now = cx.world.state.scene.clone().unwrap_or_else(|| theme::NO_SCENE.to_string());
     let names = std::iter::once(theme::NO_SCENE.to_string()).chain(cx.world.scenes.keys().cloned());
     for name in names {
@@ -304,9 +338,12 @@ pub fn appearance(out: &mut String, cx: &Ctx) {
             let _ = write!(out, "<span class=\"btn {class}\">{}</span>", esc(&label));
         }
     }
+    let _ = write!(out, "</div>");
+    looks_row(out, cx, dry_core::look::Kind::Scene, Some(now.as_str()).filter(|n| *n != theme::NO_SCENE));
+    let _ = write!(out, "<div>");
     let saved = format!("The app is in {} mode with theme {}.", cx.world.state.mode.as_str(), cx.world.active_theme);
     let how = if cx.world.hosted() {
-        "The mode and the theme are saved by the host (the theme in themes/active)."
+        "The mode, the theme and the scene are saved by the host (app.md's mode:, theme: and scene:)."
     } else if live {
         "Saved in this browser."
     } else {

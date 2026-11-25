@@ -423,14 +423,14 @@ impl Settings {
 /// row before that default. `none` (or blank) is no scene.
 pub fn settings(state: &State, theme: &Theme, layers: &[&Overrides]) -> Settings {
     let shipped = || crate::files::parse_settings(crate::shipped::FILES.iter().find(|(p, _)| *p == "app.md").map_or("", |(_, t)| *t));
-    let scene = layers.iter().rev().find_map(|l| l.scene.clone()).or_else(|| state.scene.clone()).or_else(|| shipped().0);
+    let scene = layers.iter().rev().find_map(|l| l.scene.clone()).or_else(|| state.scene.clone()).or_else(|| shipped().scene);
     let motion = layers
         .iter()
         .rev()
         .find_map(|l| l.motion)
         .or(state.motion)
         .or_else(|| theme.legacy_motion())
-        .or_else(|| shipped().1)
+        .or_else(|| shipped().motion)
         .unwrap_or(DEFAULT_MOTION);
     let scene = scene.map(|s| s.trim().to_string()).filter(|s| !s.is_empty() && s != NO_SCENE);
     Settings { scene, motion }
@@ -589,16 +589,14 @@ pub(crate) fn frac(x: f64) -> f64 {
 mod tests {
     use super::*;
 
-    /// Every scene the app ships, by name.
-    pub(crate) const SHIPPED: &[(&str, &str)] = &[
-        ("cat", include_str!("../../../../scenes/cat.md")),
-        ("terminal", include_str!("../../../../scenes/terminal.md")),
-        ("abyss", include_str!("../../../../scenes/abyss.md")),
-    ];
+    /// Every scene the app ships, `(name, text)`, read from `scenes/`.
+    pub(crate) fn shipped_all() -> Vec<(String, String)> {
+        crate::look::shipped_all(crate::look::Kind::Scene)
+    }
 
     pub(crate) fn shipped(name: &str) -> Scene {
-        let (_, text) = SHIPPED.iter().find(|(n, _)| *n == name).unwrap();
-        Scene::from_md(name, text).unwrap_or_else(|e| panic!("scenes/{name}.md: {e}"))
+        let text = crate::look::shipped(crate::look::Kind::Scene, name);
+        Scene::from_md(name, &text).unwrap_or_else(|e| panic!("scenes/{name}/scene.md: {e}"))
     }
 
     pub(crate) fn inputs(mood: Mood) -> Inputs {
@@ -607,11 +605,11 @@ mod tests {
 
     #[test]
     fn every_shipped_scene_reads_and_owns_its_colours() {
-        for (name, _) in SHIPPED {
-            let s = shipped(name);
+        for (name, _) in shipped_all() {
+            let s = shipped(&name);
             // The cat walks over the panes (their frost would hide a small
             // walker); the others are backgrounds behind them.
-            let want = if *name == "cat" { Place::Front } else { Place::Window };
+            let want = if name == "cat" { Place::Front } else { Place::Window };
             assert_eq!(s.place, want, "{name} moves across the whole window");
             for (k, ink) in &s.palette {
                 assert!(ink.light & 0xFF != 0 && ink.dark & 0xFF != 0, "{name}'s `{k}` has visible colours of its own");
@@ -622,8 +620,8 @@ mod tests {
     #[test]
     fn a_role_takes_the_themes_colour_and_its_own_is_the_fallback() {
         let theme = |text: &str| crate::theme::Theme::from_md(text).unwrap();
-        let cat_theme = theme(include_str!("../../../../themes/cat.md"));
-        let default_theme = theme(include_str!("../../../../themes/default.md"));
+        let cat_theme = theme(&crate::look::shipped(crate::look::Kind::Theme, "cat"));
+        let default_theme = theme(&crate::look::shipped(crate::look::Kind::Theme, "default"));
         let cat = shipped("cat");
         let fur = |th: &crate::theme::Theme, m: Mode| cat.colours(&crate::theme::resolve(m, th))[&'f'];
         assert_eq!(fur(&cat_theme, Mode::Light), 0xD9733FFF, "terracotta on the cat theme");
@@ -643,7 +641,7 @@ mod tests {
 
     #[test]
     fn the_scene_is_a_setting_and_the_nearest_layer_wins() {
-        let theme = crate::theme::Theme::from_md(include_str!("../../../../themes/default.md")).unwrap();
+        let theme = crate::theme::Theme::from_md(&crate::look::shipped(crate::look::Kind::Theme, "default")).unwrap();
         let mut state = State::default();
         let shipped_default = settings(&state, &theme, &[]);
         assert_eq!(shipped_default, Settings { scene: Some("cat".into()), motion: 40.0 }, "default/app.md: the cat");
@@ -749,8 +747,8 @@ mod tests {
         events.push((7.5, Box::new(|i| Inputs { pointer: i.pointer.map(|p| Pointer { inside: false, ..p }), ..i })));
         events.push((10.0, Box::new(move |i| Inputs { pointer: at(120.0, 100.0), ..i })));
         events.sort_by(|a, b| a.0.total_cmp(&b.0));
-        for (name, _) in SHIPPED {
-            let s = shipped(name);
+        for (name, _) in shipped_all() {
+            let s = shipped(&name);
             let mut live24 = start(inputs(Mood::Idle), 0.0);
             let mut live60 = live24.clone();
             // Each frame, the shell steps with every input change since the
@@ -784,7 +782,7 @@ mod tests {
                 assert_eq!(a, b, "{name} at t={t}: same positions");
                 assert!(!a.is_empty(), "{name} has something that moves");
             }
-            if *name == "cat" {
+            if name == "cat" {
                 // The pointer reached it: it ran with the sweep to where
                 // the pointer stopped, and done (working, then idle) purred
                 // hearts (anchors past the cat's own).
@@ -802,8 +800,8 @@ mod tests {
 
     #[test]
     fn motion_0_is_fully_still_and_parks() {
-        for (name, _) in SHIPPED {
-            let s = shipped(name);
+        for (name, _) in shipped_all() {
+            let s = shipped(&name);
             let still = Inputs { still: true, ..inputs(Mood::Working) };
             let live = start(still, 0.0);
             let (a, b) = (frame(&s, &live, 1.0, 60.0), frame(&s, &live, 50.0, 60.0));

@@ -1,6 +1,0 @@
-### user
-
-Work on your goal (see your instructions), then reply with the result.
-
-The research is in research/ under your root. Read research/summary.md (Voice guide l.81-102: pace, vocabulary, sentence shape, humour, tics, values, habits, moves, never, and the 10 situations l.93-102) and research/notes.md, and research/lessons.md. Inferred traits are marked (inferred) or [~]: keep them, but lean on the sourced ones. Training: on this machine `uv run --python 3.12 --with mlx-lm python -m mlx_lm lora --help` works (mlx-lm 0.32.2, Metal available). The system python is 3.14, so run everything through that uv line. Use mlx_lm generate (or mlx_lm.generate in python) for the eval. Base model, decided for all five builds: mlx-community/Qwen2.5-1.5B-Instruct-4bit (~0.9 GB). Fetch it once; record its real size (du -sh of its cache folder) and path in runs.md. If it fails to fetch or train, use mlx-community/Qwen2.5-1.5B-Instruct-4bit's smaller sibling mlx-community/Qwen2.5-0.5B-Instruct-4bit and say so. Optimise for quality first; record the training seconds and peak memory of every run, because the next builds will also optimise speed. Your runs.md feeds the next four characters' briefs.
-

@@ -1,5 +1,7 @@
 # Night loop: journal
 
+> The run captures this cites (`docs/night/runs/`) are not in the tree; they are in commit `992cc0f`: `git show 992cc0f:docs/night/runs/<path>`.
+
 Every step of the `dev/night` work, in order (worktree `../dry-learn-night`).
 Times are local, starting 2026-11-23 23:00.
 

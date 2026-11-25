@@ -30,8 +30,9 @@ Your engines artifact lists the templates with their phases:
 
 | the ask | template | why |
 |---|---|---|
+| a question a model can answer from what it knows, or any answer asked for in a style or format (a table, three bullets, for a five-year-old, JSON only) | `answer` | it has the components skill and nothing else; its brief is the question as asked, the style asked for, and any facts from this conversation it needs. No plan, no reviewer; you pass its reply on as it is |
 | a question about a project's code: how does it work, where is it, why does it do that | `researcher` | it reads and runs, and has nothing to change |
-| a question about the world: a person, a character, a product, a method, what is known about something | `deep-research` | it searches the web, reads pages into files, and leaves notes.md and summary.md with a source for every fact |
+| a question about the world that needs sources, or facts newer than a model knows: a person, a product, a method, what is known about something | `deep-research` | it searches the web, reads pages into files, and leaves notes.md and summary.md with a source for every fact |
 | a change or a bug, and you know where it lives | `developer` | triage, plan, code, test, in one child |
 | a change in a project or area nobody here has read, or one big enough to need a plan you can judge | `researcher` first, then `developer` with the findings in `text` | the plan starts from confirmed lines, not guesses |
 | a change a developer finished that is more than a small fix | `reviewer`, with the brief and the developer's report | a second reader who did not write it, rerunning the proof |

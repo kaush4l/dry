@@ -26,7 +26,7 @@ pub struct Settings {
     /// Only for a cloud server. Kept in this browser's store, never in the
     /// bundle, never drawn back.
     pub key: Option<String>,
-    /// The theme chosen here (`None`: the bundle's `themes/active`).
+    /// The theme chosen here (`None`: app.md's `theme:`, else `default`).
     pub theme: Option<String>,
 }
 

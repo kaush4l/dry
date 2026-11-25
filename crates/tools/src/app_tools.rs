@@ -39,7 +39,7 @@ fn props(p: Value, required: &[&str]) -> Value {
 }
 
 /// What `list` can list, each as text a model reads well.
-const LISTS: &[&str] = &["engines", "routes", "components", "tokens", "themes", "models", "programs", "capabilities"];
+const LISTS: &[&str] = &["engines", "routes", "components", "tokens", "themes", "scenes", "models", "programs", "capabilities"];
 
 fn list(args: &Value) -> Result<String> {
     let what = text(args, "what")?;
@@ -84,6 +84,7 @@ fn list(args: &Value) -> Result<String> {
             .map(|t| if *t == crate::active_theme() { format!("- {t} (active)") } else { format!("- {t}") })
             .collect::<Vec<_>>()
             .join("\n"),
+        "scenes" => crate::list_scenes().iter().map(|s| format!("- {s}")).collect::<Vec<_>>().join("\n"),
         "models" => crate::read(&crate::root().join("models.json"))?,
         "programs" => crate::read_sessions()?
             .tools
@@ -120,10 +121,62 @@ fn token_reset(args: &Value) -> Result<String> {
     Ok(format!("reset {name}"))
 }
 
-fn theme_use(args: &Value) -> Result<String> {
-    let name = text(args, "name")?;
-    crate::set_active_theme(&name)?;
-    Ok(format!("theme {name} is active"))
+/// `look`: the same verbs for a theme or a scene (`crate::looks`).
+fn look(args: &Value) -> Result<String> {
+    use crate::looks;
+    let kind = dry_core::look::Kind::parse(&text(args, "kind")?).ok_or("kind is theme or scene")?;
+    let name = || text(args, "name");
+    let w = kind.word();
+    match text(args, "do")?.as_str() {
+        "use" => {
+            let name = name()?;
+            match kind {
+                dry_core::look::Kind::Theme => crate::set_active_theme(&name)?,
+                dry_core::look::Kind::Scene => {
+                    if name != dry_core::theme::NO_SCENE {
+                        looks::exists(kind, &name)?;
+                    }
+                    let store = crate::store::open_default()?;
+                    let mut state = crate::store::load_or_first(&*store)?;
+                    state.scene = Some(name.clone());
+                    store.save(&state)?;
+                }
+            }
+            Ok(format!("{w} {name} is in use"))
+        }
+        "show" => looks::read_main(kind, &name()?),
+        "new" => {
+            let from = args.get("from").and_then(Value::as_str).filter(|f| !f.is_empty()).map(str::to_string);
+            let from = from.unwrap_or_else(|| if kind == dry_core::look::Kind::Theme { crate::DEFAULT_THEME.into() } else { "cat".into() });
+            let file = looks::add(kind, &name()?, &from)?;
+            Ok(format!("created {} from {from}", file.display()))
+        }
+        "set" => {
+            let (name, key, value) = (name()?, text(args, "key")?, text(args, "value")?);
+            let mode = match args.get("mode").and_then(Value::as_str) {
+                None | Some("") | Some("both") => None,
+                Some(m) => Some(Mode::parse(m).ok_or_else(|| format!("mode is light, dark or both, not {m}"))?),
+            };
+            looks::edit(kind, &name, &key, &value, mode)?;
+            Ok(format!("{w} {name}: {key} = {value}"))
+        }
+        "rm" => {
+            let name = name()?;
+            let in_use = match kind {
+                dry_core::look::Kind::Theme => vec![crate::active_theme()],
+                dry_core::look::Kind::Scene => crate::store::open_default().and_then(|s| crate::store::load_or_first(&*s))?.scene.into_iter().collect(),
+            };
+            looks::remove(kind, &name, &in_use)?;
+            Ok(format!("removed {w} {name}"))
+        }
+        "export" => looks::export(kind, &name()?),
+        "import" => {
+            let replace = args.get("replace").and_then(Value::as_bool).unwrap_or(false);
+            let pack = looks::import(&text(args, "text")?, replace)?;
+            Ok(format!("imported {} {} ({} files)", pack.kind.word(), pack.name, pack.files.len()))
+        }
+        other => Err(format!("do is use, show, new, set, rm, export or import, not {other}")),
+    }
 }
 
 fn page_create(args: &Value) -> Result<String> {
@@ -282,7 +335,7 @@ pub fn all() -> Vec<AppTool> {
     vec![
         AppTool {
             name: "list",
-            description: "List app state as text: engines, routes (pages and their components), components, tokens (the active theme: every colour, size and the font), themes, models, programs or capabilities (what this runtime can do, like voice).",
+            description: "List app state as text: engines, routes (pages and their components), components, tokens (the active theme: every colour, size and the font), themes, scenes, models, programs or capabilities (what this runtime can do, like voice).",
             schema: || props(json!({ "what": { "type": "string", "enum": LISTS } }), &["what"]),
             run: list,
         },
@@ -304,10 +357,25 @@ pub fn all() -> Vec<AppTool> {
             run: token_reset,
         },
         AppTool {
-            name: "theme_use",
-            description: "Switch the active theme (see list what=themes).",
-            schema: || props(json!({ "name": { "type": "string" } }), &["name"]),
-            run: theme_use,
+            name: "look",
+            description: "A theme (the design tokens) or a scene (the animated background or pet), each one folder (themes/<name>/, scenes/<name>/; see list what=themes or what=scenes). do: use (switch to it; a scene may be none), show (its main file), new (a copy of `from`'s folder to edit), set (one value: a theme's token, or a scene's setting or palette key; mode light/dark/both), rm (delete it; not the one in use), export (its folder as one text to share), import (that text back as a folder; replace=true overwrites).",
+            schema: || {
+                props(
+                    json!({
+                        "kind": { "type": "string", "enum": ["theme", "scene"] },
+                        "do": { "type": "string", "enum": ["use", "show", "new", "set", "rm", "export", "import"] },
+                        "name": { "type": "string" },
+                        "from": { "type": "string", "description": "new: the one to copy (default theme or cat scene if left out)" },
+                        "key": { "type": "string" },
+                        "value": { "type": "string" },
+                        "mode": { "type": "string", "enum": ["light", "dark", "both"] },
+                        "text": { "type": "string", "description": "import: an exported look" },
+                        "replace": { "type": "boolean" }
+                    }),
+                    &["kind", "do"],
+                )
+            },
+            run: look,
         },
         AppTool {
             name: "page_create",

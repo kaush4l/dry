@@ -335,6 +335,58 @@ form already gives the execution helper's compact one-line-per-command
 result. A separate reviewer and a read-only explorer are the two roles the
 developer cannot play for itself.
 
+## 4c. The answer template (2026-11-24)
+
+Owner, 2026-11-24: "The ability to answer with components is a must. Since
+we can separate out answer engine, we can write the component skills which
+will provide what all component are present, how to use them, and the right
+way of calling the component."
+
+`spec/templates/answer/`: one phase (`answer`), one tool (`reply`), one
+skill (`components`). No files, no terminal, no web.
+
+- **What goes to it** (the translator's goal and the `prompting` skill): a
+  question a model can answer from what it knows, and any answer asked for
+  in a style or format (a table, three bullets, for a five-year-old, JSON
+  only). A question that needs sources or today's facts still goes to
+  `deep-research`.
+- **The `components` skill** says which component fits which answer, each
+  display and ask with its exact call, the limits (8 columns, 30 rows, one
+  `show=` and one `ask=` a reply), and the mistakes that leave a component
+  out. A test checks it names every registered component
+  (`shipped::tests::the_answer_template_is_whole_and_holds_only_reply`), so
+  a new component without a line there fails the build.
+- **Passing it on.** A parent used to get only a child's `text`. Now a
+  reply that shows or asks carries its components to the parent on a last
+  line, in the call grammar (`engines::replies`, `turn::reply_components`):
+
+  ```text
+  last reply: Here are the four inner planets.
+  (its components, to pass on as written: show="table", data="Planet|Moons;Mercury|0;Earth|1")
+  ```
+
+  The translator writes them into its own reply as given, with no judging
+  skill and no rewording. Test:
+  `engines::tests::a_childs_reply_with_components_reaches_the_parent_with_them`.
+- **Checked** on a scratch host with Inkling-2-Mini on oMLX: "Show me the
+  four inner planets with their diameter and number of moons, as a table"
+  went to an `answer` child, came back as a table and was drawn as one on
+  the translator's page; 74 s, 6 model calls, none rejected.
+  Two more after the goal was tightened ("every other question goes to an
+  `answer` child"): a haiku (109 s) and a three-database table with a
+  choice ask (165 s); both went through an `answer` child, the table was
+  well formed and the choice was drawn. Before that line the translator
+  answered both itself in 37 s and 24 s, without the skill: it repeated the
+  table's cells in the text and wrote one row with `|` for `;`.
+- **The cost:** the hand-off is slower by three to seven times on this
+  model, and 8 of the translator's answers in that run were rejected for
+  having no `act`.
+- **Not done:** the translator copies the components by writing them again,
+  which costs tokens for a large table; passing a child's reply on by
+  reference is not built. An ask answered by the person goes to the
+  translator, not to the answer child. Three runs in all; JSON only and
+  the other asks were not run through it.
+
 ## 5. Proof (2026-11-23, scratch only)
 
 The run used a scratch store (`DRY_STORE=md:<scratchpad>/default/state`)

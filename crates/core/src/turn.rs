@@ -508,6 +508,22 @@ pub fn reply_in(e: &Engine, text: &str) -> Option<String> {
     calls.into_iter().find(|c| c.name == "reply").and_then(|c| c.arg("text").map(str::to_string))
 }
 
+/// The components of the reply in `text`: every argument but `text`,
+/// written in the call grammar (`show="table", data="A|B;1|2"`), so a
+/// parent can pass a child's answer on with what it shows and asks. None
+/// for a reply of text alone.
+pub fn reply_components(e: &Engine, text: &str) -> Option<String> {
+    let answer = e.format.parse(&e.response, text).ok()?;
+    let calls = calls::parse(Responses::get(&answer, ACT)?).ok()?;
+    let mut reply = calls.into_iter().find(|c| c.name == "reply")?;
+    reply.args.retain(|(k, _)| k != "text");
+    if reply.args.is_empty() {
+        return None;
+    }
+    let written = reply.written();
+    Some(written["reply(".len()..written.len() - 1].to_string())
+}
+
 /// The options the reply in `text` asks the user to pick from (its
 /// `choices`), if any. The chat draws them as buttons; the one picked is
 /// sent as the user's next message.

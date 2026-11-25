@@ -483,6 +483,42 @@
       case "refresh": return refresh();
       // The app's own files, written by the host (files.rs).
       case "set-theme": return post("/api/theme", { value: value }).then(done);
+      // A theme or scene is a folder (dry_core::look): copy one, remove one, or import a shared one.
+      case "look-new": {
+        var from = value.split(":"), name = prompt("A name for the copy of the " + from[0] + " " + from[1] + " (letters, digits, - and _)", from[1] + "-copy");
+        if (!name) return;
+        return post("/api/looks/" + from[0] + "/new", { name: name.trim(), from: from[1] }).then(function (v) { if (v.ok) toast("made " + from[0] + " " + v.name + " (folder " + from[0] + "s/" + v.name + "/)"); done(v); });
+      }
+      case "look-rm": {
+        var it = value.split(":"), spare = it[1].split(",");
+        var gone = prompt("Which " + it[0] + " to delete? (not the one in use): " + spare.join(", "), "");
+        if (!gone) return;
+        gone = gone.trim();
+        if (spare.indexOf(gone) < 0) return toast("no " + it[0] + " " + gone + " to delete; one of " + spare.join(", "));
+        if (!confirm("Delete the " + it[0] + " " + gone + "? Its folder " + it[0] + "s/" + gone + "/ is removed. Export it first to keep a copy.")) return;
+        return post("/api/looks/" + it[0] + "/rm", { name: gone }).then(done);
+      }
+      case "look-import": {
+        var pick = document.createElement("input");
+        pick.type = "file"; pick.accept = ".md,text/markdown,text/plain";
+        pick.onchange = function () {
+          var file = pick.files && pick.files[0];
+          if (!file) return;
+          file.text().then(function (text) {
+            var send = function (replace) {
+              return post("/api/looks/import", { text: text, replace: replace }).then(function (v) {
+                if (!v.ok && !replace && /already exists/.test(v.error || "") && confirm((v.error || "") + "\n\nReplace it?")) return send(true);
+                if (v.ok) toast("imported " + v.kind + " " + v.name);
+                done(v);
+              });
+            };
+            if (!/^\s*# dry (theme|scene):/.test(text)) return toast("not a shared " + value + ": its first line is # dry " + value + ": <name>");
+            return send(false);
+          });
+        };
+        pick.click();
+        return;
+      }
       case "reset-theme":
         if (!confirm("Put every token of this theme back to its default? This rewrites the theme file.")) return;
         return post("/api/theme/reset", {}).then(done);

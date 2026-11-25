@@ -34,7 +34,7 @@ same way the window does: `DRY_STORE`, else `md:state`, else the old
 | `/assets/app.css` | The look: `@font-face` rules, the layout frame, then `crates/html/assets/app.css`. |
 | `/assets/app.js` | The client script: the navigation button, soft navigation, and live updates. |
 | `/assets/scene.js`, `/assets/scene.wasm` | The scene behind the glass (see "The scene"). |
-| `/assets/scenes/<name>.md` | A scene file from `scenes/`. |
+| `/assets/scenes/<name>.md` | A scene's main file, `scenes/<name>/scene.md`. |
 | `/assets/fonts/<file>` | A font shipped in `assets/fonts/` (Amarante). Only files that exist there are served. |
 | `GET /api/status` | The host: its generation, the store, and per engine its index, id, name, whether it is in a turn and its activity. |
 | `POST /api/…` | The intents (see "The send path"): messages, answers, new and deleted engines, the format, the mode, Detect and Test. |
@@ -125,7 +125,7 @@ They change only what this page shows. Nothing is saved.
 
 ## The scene
 
-The scene setting's scene (`scenes/<name>.md`, docs/scenes.md) moves behind the
+The scene setting's scene (`scenes/<name>/scene.md`, docs/scenes.md) moves behind the
 glass on every page. It is drawn in the browser by the core's own scene
 code: `crates/scene` puts `dry_core::scene` (`start`, `step`, `frame`)
 behind a small C ABI, built to `crates/server/assets/scene.wasm`
@@ -241,7 +241,10 @@ POST /api/mode                     {"value": "light" | "dark"}
 POST /api/models/:name/detect      the setting's server lists its models  → {"ok", "line", "models"}
 POST /api/models/:name/test        one short message to it                → {"ok", "line"}
 POST /api/models/:name/default     the default setting (models.json)      → {"gen", "default"}
-POST /api/theme                    {"value": "<theme>"}  themes/active     → {"gen"}
+POST /api/theme                    {"value": "<theme>"}  app.md theme:     → {"gen"}
+POST /api/looks/:kind/new|set|rm   {"name", "from"? | "key", "value", "mode"?}  themes/, scenes/ → {"gen"}
+POST /api/looks/import             {"text", "replace"?}  a shared look as its folder → {"gen", "kind", "name"}
+GET  /api/looks/:kind/:name/export a look's folder as one file (a download)
 POST /api/theme/reset              every token of the theme to its default → {"gen"}
 POST /api/routes/hide|off|delete   {"value": "<pattern>"}  state/local.md, page.json → {"gen", "pattern"}
 POST /api/routes/create            {"path", "title", "icon"?}             → {"gen", "pattern"}
@@ -313,7 +316,9 @@ show as a toast. The controls `HOST_ACTS` lists:
 The app's own files are written by the host too (`crates/server/src/files.rs`,
 one writer at a time; the desktop app's writes, through `dry_tools`):
 
-- the theme picker (`themes/active`) and Reset all (the theme file);
+- the theme's Reset all (the theme file), and Copy, Remove… and Import…
+  for a theme or scene folder (the choice itself is app.md's `theme:`,
+  saved with the store like `scene:`);
   Reload theme and Reload routes/ redraw, since every page reads them
   anyway;
 - a route's Hide/Show and Turn off/on (`state/local.md`), Delete

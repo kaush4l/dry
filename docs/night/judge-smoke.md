@@ -1,5 +1,7 @@
 # Judge report: smoke3 (Opus) and smoke2 (Haiku)
 
+> The run captures this cites (`docs/night/runs/`) are not in the tree; they are in commit `992cc0f`: `git show 992cc0f:docs/night/runs/<path>`.
+
 Black-box review of two captured runs of the same task. Only files under
 `docs/night/runs/smoke3` and `docs/night/runs/smoke2` were read; no source code.
 Paths below are relative to `docs/night/runs/`. `S3` = smoke3, `S2` = smoke2.

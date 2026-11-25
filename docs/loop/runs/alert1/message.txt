@@ -1,1 +1,0 @@
-Write a python script to print a tree of height n where each level has 2 more '*'. Make it center aligned. Work in the folder /Volumes/Backup/dry-build/loop-run/alert1/proj. When that is done, look at it again by yourself two minutes later: have it run for n=4 and tell me what it printed.

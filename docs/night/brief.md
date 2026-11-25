@@ -1,10 +1,12 @@
 # Morning brief, 2026-11-24
 
+> The run captures this cites (`docs/night/runs/`) are not in the tree; they are in commit `992cc0f`: `git show 992cc0f:docs/night/runs/<path>`.
+
 Two worktrees ran in parallel on the evening of 2026-11-23: `dev/loop`
 (the hosted page on the on-device model) and `dev/night` (the desk driving
-itself overnight on the claude CLI). Both are merged: `main` is
-`ad690bf` (loop) then the night commit on top (squashed). The whole suite
-on `main`: **547 passed, 0 failed, 13 ignored**. Nothing was pushed.
+itself overnight on the claude CLI). Both are merged and squashed into one
+commit on `main`, `992cc0f`, pushed. The whole suite on it: **547 passed,
+0 failed, 13 ignored**.
 
 Details: [docs/loop/journal.md](../loop/journal.md),
 [journal.md](journal.md), [judge-night1.md](judge-night1.md),
@@ -148,5 +150,5 @@ Proposed order for the rest:
   data (about 2.7 GB) in `/Volumes/Backup/dry-build/night-run/night1/proj`;
   the default's spec changes do not reach a live `state/default/spec` until
   merged there.
-- I committed to `main` because you asked for the merge; the standing rule
-  for this repo is that you test and commit. Not pushed.
+- I committed to `main` and pushed because you asked for the merge and the
+  push; the standing rule for this repo is that you test and commit.

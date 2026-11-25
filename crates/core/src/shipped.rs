@@ -138,6 +138,26 @@ mod tests {
     }
 
     #[test]
+    fn the_answer_template_is_whole_and_holds_only_reply() {
+        let s = state().unwrap();
+        let kits = crate::kit::kits(&s.engines[0]);
+        let k = kits.get("answer").expect("an answer template");
+        assert_eq!(k.problem(), None);
+        assert_eq!(k.phases(), ["answer"]);
+        assert_eq!(k.tools.clone().unwrap_or_default(), ["reply"], "no files, no terminal");
+        let skill = &k.skills["components"];
+        // The skill names every registered component, so none is missing from it.
+        let text = format!("{skill:?}");
+        for kind in crate::show::registry().iter().map(|e| e.show.name().to_string()) {
+            assert!(text.contains(&format!("show=\\\"{kind}\\\"")), "the skill shows show={kind}");
+        }
+        for kind in crate::ask::registry().iter().map(|e| e.ask.name().to_string()) {
+            assert!(text.contains(&format!("ask=\\\"{kind}\\\"")), "the skill shows ask={kind}");
+        }
+        assert!(s.engines[0].description.contains("to `answer`"), "the translator sends plain questions to it");
+    }
+
+    #[test]
     fn the_reviewer_and_researcher_templates_are_whole() {
         let s = state().unwrap();
         let kits = crate::kit::kits(&s.engines[0]);

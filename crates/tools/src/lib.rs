@@ -13,6 +13,7 @@ use std::path::{Path, PathBuf};
 use dry_core::pages::{self, Component, ComponentFile, Local, Page, Snapshot};
 use dry_core::response::{Format, Responses};
 use dry_core::session::Sessions;
+use dry_core::look::Kind;
 use dry_core::theme::{Overrides, Theme};
 
 pub mod app_tools;
@@ -23,6 +24,7 @@ pub mod companion;
 pub mod evidence;
 pub mod host;
 pub mod live;
+pub mod looks;
 pub mod mcp;
 pub mod net;
 pub mod settings;
@@ -47,12 +49,13 @@ pub fn components_dir() -> PathBuf {
     root().join("components")
 }
 
-/// The theme files: `themes/<name>.md`, and `themes/active` naming the one in use.
+/// The themes: one folder each, `themes/<name>/theme.md` (`dry_core::look`).
 pub fn themes_dir() -> PathBuf {
     root().join("themes")
 }
 
-/// The scene files: `scenes/<name>.md`, one named by the app's `scene` setting.
+/// The scenes: one folder each, `scenes/<name>/scene.md`; app.md's
+/// `scene:` names the one in use.
 pub fn scenes_dir() -> PathBuf {
     root().join("scenes")
 }
@@ -60,14 +63,9 @@ pub fn scenes_dir() -> PathBuf {
 /// The theme used when none is chosen, or the chosen one is gone.
 pub const DEFAULT_THEME: &str = "default";
 
-/// The file that holds the active theme's name, one line.
-pub fn active_file() -> PathBuf {
-    themes_dir().join("active")
-}
-
-/// `themes/<name>.md`.
+/// `themes/<name>/theme.md`.
 pub fn theme_file_named(name: &str) -> PathBuf {
-    themes_dir().join(format!("{name}.md"))
+    looks::main_file(Kind::Theme, name)
 }
 
 /// The active theme's file: what the token tools read and write.
@@ -212,7 +210,7 @@ fn walk(dir: &Path, folder: &str, loaded: &mut Loaded) {
 /// Err if the route has no `themes/<name>.md`.
 pub fn set_route_theme(pattern: &str, name: &str) -> Result {
     let themes = routes_dir().join(pages::pattern_to_folder(pattern)).join("themes");
-    if !valid_theme_name(name) || !themes.join(format!("{name}.md")).exists() {
+    if !dry_core::look::valid_name(name) || !themes.join(format!("{name}.md")).exists() {
         return Err(format!("route {pattern} has no theme \"{name}\""));
     }
     write(&themes.join("active"), &format!("{name}\n"))
@@ -398,65 +396,46 @@ pub fn read_responses() -> Result<(Responses, Format)> {
 
 // ---- theme ---------------------------------------------------------------------
 
-/// Every theme's name (the `.md` files in `themes/`), sorted.
+/// Every theme's name (the folders in `themes/` with a `theme.md`), sorted.
 pub fn list_themes() -> Vec<String> {
-    let Ok(entries) = fs::read_dir(themes_dir()) else { return Vec::new() };
-    let mut names: Vec<String> = entries
-        .flatten()
-        .filter_map(|e| {
-            let path = e.path();
-            if path.extension()? != "md" {
-                return None;
-            }
-            path.file_stem()?.to_str().map(String::from)
-        })
-        .collect();
-    names.sort();
-    names
+    looks::list(Kind::Theme)
 }
 
-/// The active theme's name, from `themes/active`. No file, a blank one, or
-/// a name with no theme file: `default`.
+/// The theme `state` says (app.md's `theme:`), if there is such a folder;
+/// else `default`.
+pub fn active_theme_in(state: &dry_core::state::State) -> String {
+    state.theme.clone().filter(|name| dry_core::look::valid_name(name) && theme_file_named(name).exists()).unwrap_or_else(|| DEFAULT_THEME.to_string())
+}
+
+/// The active theme's name, from the store's app.md (`theme:`). No such
+/// line, or a name with no folder: `default`.
 pub fn active_theme() -> String {
-    fs::read_to_string(active_file())
-        .ok()
-        .map(|t| t.trim().to_string())
-        .filter(|name| !name.is_empty() && theme_file_named(name).exists())
-        .unwrap_or_else(|| DEFAULT_THEME.to_string())
+    match store::open_default().and_then(|s| store::load_or_first(&*s)) {
+        Ok(state) => active_theme_in(&state),
+        Err(_) => DEFAULT_THEME.to_string(),
+    }
 }
 
-/// Make `name` the active theme. Err if there is no `themes/<name>.md`.
+/// Make `name` the active theme: app.md's `theme:` in the store. Err if
+/// there is no `themes/<name>/`. A running host sets it in its own state
+/// instead (`Host::set_theme`), so the two never race.
 pub fn set_active_theme(name: &str) -> Result {
-    if !valid_theme_name(name) || !theme_file_named(name).exists() {
-        return Err(format!("no theme \"{name}\" (themes: {})", list_themes().join(", ")));
-    }
-    write(&active_file(), &format!("{name}\n"))
+    looks::exists(Kind::Theme, name)?;
+    let store = store::open_default()?;
+    let mut state = store::load_or_first(&*store)?;
+    state.theme = Some(name.to_string());
+    store.save(&state)
 }
 
-/// Read `themes/<name>.md`. An error names the file.
+/// Read `themes/<name>/theme.md`. An error names the file.
 pub fn read_theme_named(name: &str) -> Result<Theme> {
-    Theme::from_md(&read(&theme_file_named(name))?).map_err(|e| format!("themes/{name}.md {e}"))
+    Theme::from_md(&looks::read_main(Kind::Theme, name)?).map_err(|e| format!("themes/{name}/theme.md {e}"))
 }
 
-/// Create `themes/<name>.md` as a copy of theme `from`, a template to edit.
-/// Err if `name` exists already or `from` does not. Returns the new file.
+/// Create theme `name` as a copy of theme `from` (its whole folder), a
+/// template to edit. Returns the new main file.
 pub fn new_theme(name: &str, from: &str) -> Result<PathBuf> {
-    if !valid_theme_name(name) {
-        return Err(format!("\"{name}\" is not a theme name (letters, digits, - and _)"));
-    }
-    let file = theme_file_named(name);
-    if file.exists() {
-        return Err(format!("theme \"{name}\" already exists"));
-    }
-    // Read it as a theme first, so a broken template is not copied.
-    read_theme_named(from)?;
-    write(&file, &read(&theme_file_named(from))?)?;
-    Ok(file)
-}
-
-/// A name that is one plain file in `themes/`: no slashes or dots.
-fn valid_theme_name(name: &str) -> bool {
-    !name.is_empty() && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+    looks::add(Kind::Theme, name, from)
 }
 
 /// Read the active theme.
@@ -501,32 +480,23 @@ pub fn save_theme(theme: &Theme) -> Result {
     write(&theme_file(), &theme.to_md())
 }
 
-// ---- scenes --------------------------------------------------------------------
-
-/// Every scene's name (the `.md` files in `scenes/`), sorted.
-pub fn list_scenes() -> Vec<String> {
-    let Ok(entries) = fs::read_dir(scenes_dir()) else { return Vec::new() };
-    let mut names: Vec<String> = entries
-        .flatten()
-        .filter_map(|e| {
-            let path = e.path();
-            if path.extension()? != "md" {
-                return None;
-            }
-            path.file_stem()?.to_str().map(String::from)
-        })
-        .collect();
-    names.sort();
-    names
+/// Write theme `name`'s main file.
+pub fn write_theme_named(name: &str, theme: &Theme) -> Result {
+    looks::exists(Kind::Theme, name)?;
+    write(&theme_file_named(name), &theme.to_md())
 }
 
-/// Read `scenes/<name>.md`. An error names the file.
+// ---- scenes --------------------------------------------------------------------
+
+/// Every scene's name (the folders in `scenes/` with a `scene.md`), sorted.
+pub fn list_scenes() -> Vec<String> {
+    looks::list(Kind::Scene)
+}
+
+/// Read `scenes/<name>/scene.md`. An error names the file.
 pub fn read_scene(name: &str) -> Result<dry_core::scene::Scene> {
-    if !dry_core::theme::valid_scene_name(name) {
-        return Err(format!("\"{name}\" is not a scene name"));
-    }
-    let file = scenes_dir().join(format!("{name}.md"));
-    dry_core::scene::Scene::from_md(name, &read(&file)?).map_err(|e| format!("scenes/{name}.md: {e}"))
+    let text = looks::read_main(Kind::Scene, name)?;
+    dry_core::scene::Scene::from_md(name, &text).map_err(|e| format!("scenes/{name}/scene.md: {e}"))
 }
 
 #[cfg(test)]
@@ -539,8 +509,10 @@ mod tests {
         assert!(names.iter().any(|n| n == DEFAULT_THEME) && names.iter().any(|n| n == "terminal"), "{names:?}");
         for name in names {
             let theme = read_theme_named(&name).unwrap();
-            assert_eq!(theme.missing(), Vec::<&str>::new(), "themes/{name}.md");
+            assert_eq!(theme.missing(), Vec::<&str>::new(), "themes/{name}/theme.md");
         }
+        let default = dry_core::shipped::state().unwrap();
+        assert_eq!(active_theme_in(&default), DEFAULT_THEME, "default/app.md names the default theme");
     }
 
     #[test]
@@ -604,8 +576,8 @@ mod tests {
 
     #[test]
     fn theme_names_are_plain_file_names() {
-        assert!(valid_theme_name("my-theme_2"));
-        assert!(!valid_theme_name("") && !valid_theme_name("../x") && !valid_theme_name("a.b"));
+        assert!(dry_core::look::valid_name("my-theme_2"));
+        assert!(!dry_core::look::valid_name("") && !dry_core::look::valid_name("../x") && !dry_core::look::valid_name("a.b"));
         assert!(set_active_theme("no-such-theme").is_err());
         assert!(new_theme(DEFAULT_THEME, "terminal").is_err(), "exists already");
         assert!(new_theme("x", "no-such-theme").is_err());

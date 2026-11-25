@@ -1,5 +1,7 @@
 # Hosted loop: journal
 
+> The run captures this cites (`docs/loop/runs/`) are not in the tree; they are in commit `992cc0f`: `git show 992cc0f:docs/loop/runs/<path>`.
+
 Every step of the `dev/loop` work, in order, as it happened (worktree
 `../dry-learn-loop`, from `main` at `f129e64`). Times are local, 2026-11-23.
 Shots are in `docs/loop/shots/`.

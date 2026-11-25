@@ -58,11 +58,11 @@ pub fn save_models(models: &Models) -> std::io::Result<()> {
     fs::rename(&tmp, MODELS_FILE)
 }
 
-/// The design tokens come from the active theme, `themes/<name>.md`
-/// (`dry_tools` finds it: `themes/active`, else `default`). Missing or
-/// broken is an error (there are no token values in the code to fall back on).
-pub fn load_theme() -> Result<Theme, String> {
-    dry_tools::read_theme()
+/// The design tokens come from the active theme, `themes/<name>/theme.md`
+/// (the state's `theme:`, else `default`). Missing or broken is an error
+/// (there are no token values in the code to fall back on).
+pub fn load_theme(state: &State) -> Result<Theme, String> {
+    dry_tools::read_theme_named(&dry_tools::active_theme_in(state))
 }
 
 /// This machine's own token choices, `state/local.md`; None without it.
@@ -71,13 +71,13 @@ pub fn load_local_theme() -> Result<Option<dry_core::theme::Overrides>, String> 
 }
 
 /// Write the active theme's file (temp file + rename).
-pub fn save_theme(theme: &Theme) -> Result<(), String> {
-    dry_tools::save_theme(theme)
+pub fn save_theme(state: &State, theme: &Theme) -> Result<(), String> {
+    dry_tools::write_theme_named(&dry_tools::active_theme_in(state), theme)
 }
 
 /// Every theme's name, and the active one's.
-pub fn themes() -> (Vec<String>, String) {
-    (dry_tools::list_themes(), dry_tools::active_theme())
+pub fn themes(state: &State) -> (Vec<String>, String) {
+    (dry_tools::list_themes(), dry_tools::active_theme_in(state))
 }
 
 /// Every scene in `scenes/`, read and checked: name → the scene, or why
@@ -89,14 +89,9 @@ pub fn load_scenes() -> std::collections::BTreeMap<String, Result<dry_core::scen
     }).collect()
 }
 
-/// Make `name` the active theme (writes `themes/active`).
-pub fn use_theme(name: &str) -> Result<(), String> {
-    dry_tools::set_active_theme(name)
-}
-
 /// The newest modification time among the files the app is built from
-/// (everything under `themes/`, `scenes/`, `routes/` and `components/`, so also
-/// `themes/active`, and `sessions.json`). When it changes, something was edited.
+/// (everything under `themes/`, `scenes/`, `routes/` and `components/`, and
+/// `sessions.json`). When it changes, something was edited.
 pub fn files_stamp() -> Option<std::time::SystemTime> {
     fn newest(path: &Path, best: &mut Option<std::time::SystemTime>) {
         let Ok(meta) = fs::metadata(path) else { return };

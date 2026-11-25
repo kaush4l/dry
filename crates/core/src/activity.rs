@@ -270,20 +270,14 @@ mod tests {
         ];
         assert_eq!(all.iter().filter_map(Activity::token).collect::<Vec<_>>(), TOKENS, "one token each, in order");
         assert_eq!(Activity::Idle.token(), None, "idle has no tint");
-        for (name, text) in [
-            ("default", include_str!("../../../themes/default.md")),
-            ("terminal", include_str!("../../../themes/terminal.md")),
-            ("cat", include_str!("../../../themes/cat.md")),
-            ("abyss", include_str!("../../../themes/abyss.md")),
-            ("bolt", include_str!("../../../themes/bolt.md")),
-        ] {
-            let theme = Theme::from_md(text).unwrap();
+        for (name, text) in crate::look::shipped_all(crate::look::Kind::Theme) {
+            let theme = Theme::from_md(&text).unwrap();
             for mode in [Mode::Light, Mode::Dark] {
                 let t = resolve(mode, &theme);
                 for a in &all {
                     let c = t.color(a.token().unwrap()).unwrap();
                     let alpha = c & 0xFF;
-                    assert!(alpha > 0 && alpha < 0xFF, "themes/{name}.md {}: a translucent tint, not {c:08X}", a.token().unwrap());
+                    assert!(alpha > 0 && alpha < 0xFF, "themes/{name}/theme.md {}: a translucent tint, not {c:08X}", a.token().unwrap());
                 }
             }
         }

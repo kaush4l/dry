@@ -50,9 +50,8 @@ fn scratch(name: &str) -> PathBuf {
     for file in ["models.json", "sessions.json", "responses.md"] {
         std::fs::copy(repo.join(file), root.join(file)).unwrap();
     }
-    // The default theme, whatever the checkout's `themes/active` says now
-    // (the tests edit `themes/default.md` and look for it on the page).
-    std::fs::write(root.join("themes/active"), "default\n").unwrap();
+    // The sample state names no theme: the default one (the tests edit
+    // `themes/default/theme.md` and look for it on the page).
     MdStore { root: root.join("state") }.save(&dry_core::files::sample()).unwrap();
     root
 }
@@ -221,7 +220,7 @@ fn the_event_stream_says_when_the_store_or_the_files_change() {
     assert!(get(&s, "/").contains("Renamed"), "and the page drawn now shows it");
 
     // A theme file is edited.
-    let theme = s.root.join("themes/default.md");
+    let theme = s.root.join("themes/default/theme.md");
     let text = std::fs::read_to_string(&theme).unwrap();
     std::fs::write(&theme, text.replace("| radius | 15 |", "| radius | 9 |")).unwrap();
     let change = wait_for(&mut lines, "change", Duration::from_secs(10)).expect("a change after a theme was edited");

@@ -14,11 +14,17 @@
 //! component <name> [<component...>]      create a component file, or add to it
 //! export [file]                          every route and component as one JSON
 //! import <file>                          create the routes/ and components/ files back from it
-//! themes                                 list the themes in themes/, * marks the active one
-//! theme use <name>                       switch the app to themes/<name>.md
-//! theme new <name> [--from default]      a new theme, a copy of another to edit
-//! scenes                                 list the scenes in scenes/, checked; * marks the one in force
+//! themes                                 list the themes (themes/<name>/), * marks the active one
+//! theme use <name>                       switch the app to it (app.md `theme:`)
+//! scenes                                 list the scenes (scenes/<name>/), checked; * marks the one in force
 //! scene use <name>|none                  the app's scene (app.md `scene:`; state/local.md's ## Scene row beats it)
+//! theme|scene show <name>                its main file (theme.md, scene.md)
+//! theme|scene new <name> [--from <name>] a new one, a copy of another's whole folder to edit
+//! theme|scene set <name> <key> <value> [light|dark]
+//!                                        one value: a theme's token; a scene's setting or palette key
+//! theme|scene rm <name>                  delete its folder (not the one in use, not the default theme)
+//! theme|scene export <name> [<file>]     its folder as one file to share (printed without <file>)
+//! theme|scene import <file> [--replace]  a shared one back as its folder
 //! motion <seconds>                       the app's motion (app.md `motion:`; 0 keeps the backdrop and scene still)
 //! mcp                                    serve the app tools as an MCP server on stdio
 //! mcp <group>                            serve one tool group: app (the default), settings, all, engines
@@ -75,6 +81,7 @@ use std::process::ExitCode;
 
 use dry_core::pages::{self, Component, Page, Snapshot};
 use dry_core::routes::Nav;
+use dry_core::look::Kind;
 use dry_core::theme::{self, COLOR_NAMES, FONT, Mode, NUMBER_NAMES, SCENE};
 use dry_tools::{self as files, Result};
 
@@ -152,8 +159,7 @@ fn run(args: &[&str]) -> Result {
         ["scenes"] => list_scenes(),
         ["scene", "use", name] => scene_setting(Some(name), None),
         ["motion", secs] => scene_setting(None, Some(secs)),
-        ["theme", "new", name] => theme_new(name, files::DEFAULT_THEME),
-        ["theme", "new", name, "--from", from] => theme_new(name, from),
+        [kind @ ("theme" | "scene"), rest @ ..] => look_command(Kind::parse(kind).unwrap(), rest),
         ["mcp"] => files::app_tools::serve(),
         ["mcp", group] => files::app_tools::serve_tools(files::app_tools::group(group)?),
         ["snapshot", rest @ ..] => print(files::worker::snapshot_command(rest)),
@@ -593,9 +599,65 @@ fn scene_setting(scene: Option<&str>, motion: Option<&str>) -> Result {
     Ok(())
 }
 
-fn theme_new(name: &str, from: &str) -> Result {
-    let file = files::new_theme(name, from)?;
-    println!("created {} from {from} (switch to it with `dry theme use {name}`)", file.display());
+/// `dry theme …` and `dry scene …` past `use`: the same verbs for both
+/// (`dry_tools::looks`).
+fn look_command(kind: Kind, rest: &[&str]) -> Result {
+    use files::looks;
+    let first = match kind {
+        Kind::Theme => files::DEFAULT_THEME,
+        Kind::Scene => "cat",
+    };
+    match rest {
+        ["show", name] => print(looks::read_main(kind, name)),
+        ["new", name] => look_new(kind, name, first),
+        ["new", name, "--from", from] => look_new(kind, name, from),
+        ["set", name, key, value] => look_set(kind, name, key, value, None),
+        ["set", name, key, value, mode] => look_set(kind, name, key, value, Some(parse_mode(mode)?)),
+        ["rm", name] => {
+            looks::remove(kind, name, &in_use(kind)?)?;
+            println!("removed {} {name} ({})", kind.word(), looks::folder(kind, name).display());
+            Ok(())
+        }
+        ["export", name] => print(looks::export(kind, name)),
+        ["import", file] => look_import(kind, file, false),
+        ["import", file, "--replace"] | ["import", "--replace", file] => look_import(kind, file, true),
+        ["export", name, file] => {
+            std::fs::write(file, looks::export(kind, name)?).map_err(|e| format!("{file}: {e}"))?;
+            println!("wrote {} {name} to {file}", kind.word());
+            Ok(())
+        }
+        _ => Err(format!("unknown command: dry {} {}; see the list at the top of crates/tools/src/main.rs", kind.word(), rest.join(" "))),
+    }
+}
+
+/// The looks of `kind` the app uses now, which `rm` refuses.
+fn in_use(kind: Kind) -> Result<Vec<String>> {
+    Ok(match kind {
+        Kind::Theme => vec![files::active_theme()],
+        Kind::Scene => scene_settings()?.scene.into_iter().collect(),
+    })
+}
+
+fn look_new(kind: Kind, name: &str, from: &str) -> Result {
+    let file = files::looks::add(kind, name, from)?;
+    println!("created {} from {from} (use it with `dry {} use {name}`)", file.display(), kind.word());
+    Ok(())
+}
+
+fn look_set(kind: Kind, name: &str, key: &str, value: &str, mode: Option<Mode>) -> Result {
+    files::looks::edit(kind, name, key, value, mode)?;
+    println!("{} {name}: {key} = {value}{}", kind.word(), mode.map_or(String::new(), |m| format!(" ({})", m.as_str())));
+    Ok(())
+}
+
+fn look_import(kind: Kind, file: &str, replace: bool) -> Result {
+    let text = std::fs::read_to_string(file).map_err(|e| format!("{file}: {e}"))?;
+    let read = dry_core::look::import(&text)?;
+    if read.kind != kind {
+        return Err(format!("{file} is a {}: dry {} import {file}", read.kind.word(), read.kind.word()));
+    }
+    let pack = files::looks::import(&text, replace)?;
+    println!("imported {} {} ({} files) into {}", pack.kind.word(), pack.name, pack.files.len(), files::looks::folder(pack.kind, &pack.name).display());
     Ok(())
 }
 

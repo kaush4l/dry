@@ -266,13 +266,14 @@ impl AppView {
         // This machine's capabilities (compiled and capabilities/*.md, probed).
         let mut state = state;
         state.equip(dry_tools::capability::local_cached().0.clone());
+        let themes = store::themes(&state);
         AppView {
             saved: state.clone(),
             store,
             state,
             theme,
             local_theme: store::load_local_theme().ok().flatten(),
-            themes: store::themes(),
+            themes,
             scenes: store::load_scenes(),
             scene_view: cx.new(|cx| scene::SceneView::new(window, cx)),
             models,
@@ -832,6 +833,19 @@ impl AppView {
         }
     }
 
+    /// Use scene `name` (`none` for none): app.md's `scene:`, saved with
+    /// the state. A machine's `state/local.md` `## Scene` row still wins.
+    pub(crate) fn use_scene(&mut self, name: &str, window: &mut Window, cx: &mut Context<Self>) {
+        if name != theme::NO_SCENE && !self.scenes.contains_key(name) {
+            return;
+        }
+        self.state.scene = Some(name.to_string());
+        if self.view.location == UI_PATH {
+            self.fill_token_inputs(window, cx);
+        }
+        cx.notify();
+    }
+
     /// (Re)make the UI page's edit boxes, each holding its token's current value.
     fn fill_token_inputs(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let t = theme::resolve(self.state.mode, &self.theme);
@@ -913,10 +927,14 @@ impl AppView {
         cx.notify();
     }
 
-    /// Switch to theme `name` (writes `themes/active`) and draw with it now.
+    /// Switch to theme `name` (the state's `theme:`, saved with it) and
+    /// draw with it now.
     pub(crate) fn use_theme(&mut self, name: &str, window: &mut Window, cx: &mut Context<Self>) {
-        match store::use_theme(name) {
-            Ok(()) => self.reload_theme(window, cx),
+        match dry_tools::looks::exists(dry_core::look::Kind::Theme, name) {
+            Ok(()) => {
+                self.state.theme = Some(name.to_string());
+                self.reload_theme(window, cx)
+            }
             Err(e) => {
                 self.token_errors = vec![e];
                 cx.notify();
@@ -927,9 +945,9 @@ impl AppView {
     /// Read the active theme again (after switching, or editing it by hand
     /// or with the tool).
     pub(crate) fn reload_theme(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.themes = store::themes();
+        self.themes = store::themes(&self.state);
         self.scenes = store::load_scenes();
-        match store::load_theme() {
+        match store::load_theme(&self.state) {
             Ok(theme) => {
                 self.theme = theme;
                 self.token_errors.clear();
@@ -948,7 +966,7 @@ impl AppView {
     }
 
     fn save_theme(&mut self, errors: &mut Vec<String>) {
-        if let Err(e) = store::save_theme(&self.theme) {
+        if let Err(e) = store::save_theme(&self.state, &self.theme) {
             errors.push(format!("could not write the theme: {e}"));
         }
     }
@@ -1911,7 +1929,7 @@ fn main() {
             eprintln!("the store did not read: {e}");
         }
         // Every colour, size and the font come from the active theme file.
-        let theme = store::load_theme().unwrap_or_else(|e| {
+        let theme = store::load_theme(&state).unwrap_or_else(|e| {
             eprintln!("{e}");
             theme::Theme::default()
         });

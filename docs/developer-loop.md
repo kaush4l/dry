@@ -162,7 +162,7 @@ Routes (both `nav: no`, both `use` the workbench):
 
 The look is a flat workbench (changed 2026-11-23): each live route folder
 has an `overrides.md` with the Code page's dense, square sizes and the
-colours of `themes/bolt.md` (a depth scale of near-blacks, hairline
+colours of `themes/bolt/theme.md` (a depth scale of near-blacks, hairline
 borders, one purple accent, learned from bolt.new and bolt.diy:
 docs/loop/bolt-study.md), in light and dark, so it follows the app's mode.
 The colours are written out there, so the workbench looks the same

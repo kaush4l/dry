@@ -10,8 +10,8 @@ use crate::{AppView, button};
 /// The settings sections. Each is a primitive a page can place
 /// (`appearance`, `models`, `routes`, `diagnostics`, `new-route`);
 /// `routes/settings/page.json` puts them together.
-/// Light / Dark, and one button per theme in `themes/` (the active one
-/// filled); a theme button switches to it at once.
+/// Light / Dark, one button per theme in `themes/` and one per scene in
+/// `scenes/` (and Off); the one in use filled, a button switches at once.
 pub fn appearance(app: &AppView, t: &Tokens, cx: &mut Context<AppView>) -> Div {
     let choice = |mode: Mode, label: &'static str, cx: &mut Context<AppView>| {
         let active = app.state.mode == mode;
@@ -29,6 +29,18 @@ pub fn appearance(app: &AppView, t: &Tokens, cx: &mut Context<AppView>) -> Div {
                 .on_click(cx.listener(move |this, _, window, cx| this.use_theme(&pick, window, cx)))
         })
         .collect();
+    // The scene in force (a machine's local.md row may beat app.md's).
+    let now = app.scene_settings().scene.unwrap_or_else(|| dry_core::theme::NO_SCENE.to_string());
+    let scenes: Vec<_> = std::iter::once(dry_core::theme::NO_SCENE.to_string())
+        .chain(app.scenes.keys().cloned())
+        .map(|name| {
+            let label = if name == dry_core::theme::NO_SCENE { "Off".to_string() } else { name.clone() };
+            let (on, pick) = (name == now, name.clone());
+            button(SharedString::from(format!("scene-{name}")), label, t)
+                .when(on, |b| b.bg(color(t.accent)).text_color(color(t.on_accent)))
+                .on_click(cx.listener(move |this, _, window, cx| this.use_scene(&pick, window, cx)))
+        })
+        .collect();
     div()
         .flex()
         .flex_col()
@@ -37,6 +49,8 @@ pub fn appearance(app: &AppView, t: &Tokens, cx: &mut Context<AppView>) -> Div {
         .child(div().flex().gap(px(t.space_2)).child(choice(Mode::Light, "☀ Light", cx)).child(choice(Mode::Dark, "☾ Dark", cx)))
         .child(section("THEME · themes/", t))
         .child(div().flex().flex_wrap().gap(px(t.space_2)).children(themes))
+        .child(section("SCENE · scenes/", t))
+        .child(div().flex().flex_wrap().gap(px(t.space_2)).children(scenes))
 }
 
 /// Reset history (`dry_core::store::RESET_LABEL`): the first press opens

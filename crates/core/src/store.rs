@@ -182,8 +182,8 @@ pub fn to_texts(state: &State) -> Texts {
 pub fn from_texts(texts: &Texts) -> Result<State, String> {
     let app = texts.get("app.md").map_or("", String::as_str);
     let (mode, ids) = files::parse_app(app);
-    let (scene, motion) = files::parse_settings(app);
-    let mut state = State { mode, scene, motion, ..State::default() };
+    let files::Settings { theme, scene, motion } = files::parse_settings(app);
+    let mut state = State { mode, theme, scene, motion, ..State::default() };
     for level in std::iter::once(String::new()).chain(ids.iter().map(|(id, _)| id.clone())) {
         if let Some(text) = texts.get(&shared_path(&level)) {
             state.shared.insert(level, text.clone());
@@ -250,7 +250,7 @@ pub fn hidden_paths(text: &str) -> Vec<String> {
 
 /// The `app.md` settings layered one by one, not as the whole file: a
 /// store's `app.md` that does not say one reads the base's.
-pub const LAYERED_SETTINGS: &[&str] = &["scene", "motion"];
+pub const LAYERED_SETTINGS: &[&str] = &["theme", "scene", "motion"];
 
 /// `app.md`'s `key: value` line for `key` (before the engines), if any.
 fn setting_line<'a>(app: &'a str, key: &str) -> Option<&'a str> {
@@ -609,9 +609,9 @@ mod tests {
         assert!(over.contains_key(goal) && !over.contains_key("engines/translator/spec/engine.md"));
         assert_eq!(from_texts(&merge(&base, &over)).unwrap(), state);
         // A store with its own app.md keeps its engines: the default adds none.
-        // (Its app.md names no scene or motion: those read the default's.)
+        // (Its app.md names no theme, scene or motion: those read the default's.)
         let own = to_texts(&files::sample());
-        let with_default = State { scene: Some("cat".into()), motion: Some(40.0), ..files::sample() };
+        let with_default = State { theme: Some("default".into()), scene: Some("cat".into()), motion: Some(40.0), ..files::sample() };
         let read = from_texts(&merge(&base, &own)).unwrap();
         assert_eq!(read, with_default);
         let over = split(&base, &own);

@@ -73,17 +73,20 @@ pub const HOST_ACTS: &[&str] = &[
     "route-delete",
     "route-create",
     "reset-theme",
+    "look-new",
+    "look-rm",
+    "look-import",
     "reload-spec",
     "run-terminal",
     "reset-history",
 ];
 
 /// Controls only a host takes: they write the app's files on its disk
-/// (`routes/`, `themes/`, `state/local.md`, `models.json`), read its
+/// (`routes/`, `themes/`, `scenes/`, `state/local.md`, `models.json`), read its
 /// store, or run a typed command on its machine. The browser draws them
 /// off (`NATIVE_ONLY`): it has none of those.
 pub const HOST_ONLY: &[&str] =
-    &["make-default", "route-hide", "route-off", "route-delete", "route-create", "reset-theme", "reload-spec", "run-terminal"];
+    &["make-default", "route-hide", "route-off", "route-delete", "route-create", "reset-theme", "look-new", "look-rm", "look-import", "reload-spec", "run-terminal"];
 
 /// Whether the controls that change the app work here.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -252,7 +255,7 @@ impl World {
     /// `components/…`, `themes/…`, `models.json`, `sessions.json`; what
     /// the browser bundles), a state, and this machine's `local.md` (its
     /// token rows and its hidden routes). `active`: the theme chosen here,
-    /// else `themes/active`. The host, repo and the rest are the shell's
+    /// else the state's (app.md `theme:`). The host, repo and the rest are the shell's
     /// to set after; until then nothing is reached (`NoHost`, `NoRepo`).
     pub fn from_files(files: &BTreeMap<String, String>, state: State, local_md: &str, active: Option<&str>) -> World {
         let loaded = load_files(files);
@@ -262,14 +265,15 @@ impl World {
         for p in &view.removed {
             table.remove(p);
         }
+        use dry_core::look::{self, Kind};
         let mut named_themes = BTreeMap::new();
         for (path, text) in files.range("themes/".to_string()..).take_while(|(p, _)| p.starts_with("themes/")) {
-            if let Some(name) = path["themes/".len()..].strip_suffix(".md").filter(|n| !n.contains('/')) {
-                named_themes.insert(name.to_string(), Theme::from_md(text).map_err(|e| format!("themes/{name}.md {e}")));
+            if let Some(name) = look::name_of(Kind::Theme, path) {
+                named_themes.insert(name.clone(), Theme::from_md(text).map_err(|e| format!("{path} {e}")));
             }
         }
         let themes: Vec<String> = named_themes.keys().cloned().collect();
-        let wanted = active.map(str::to_string).or_else(|| files.get("themes/active").map(|t| t.trim().to_string()));
+        let wanted = active.map(str::to_string).or_else(|| state.theme.clone());
         let active_theme = wanted.filter(|n| named_themes.contains_key(n)).unwrap_or_else(|| "default".to_string());
         let theme = named_themes.get(&active_theme).cloned().unwrap_or_else(|| Err(format!("no theme {active_theme}")));
         let local_theme = if local_md.trim().is_empty() { None } else { Overrides::from_md(local_md).ok() };
@@ -277,8 +281,9 @@ impl World {
             .range("scenes/".to_string()..)
             .take_while(|(p, _)| p.starts_with("scenes/"))
             .filter_map(|(path, text)| {
-                let name = path["scenes/".len()..].strip_suffix(".md").filter(|n| !n.contains('/'))?;
-                Some((name.to_string(), dry_core::scene::Scene::from_md(name, text).map_err(|e| format!("scenes/{name}.md: {e}"))))
+                let name = look::name_of(Kind::Scene, path)?;
+                let scene = dry_core::scene::Scene::from_md(&name, text).map_err(|e| format!("{path}: {e}"));
+                Some((name, scene))
             })
             .collect();
         let json = |name: &str| files.get(name).ok_or_else(|| format!("no {name}"));

@@ -8,9 +8,6 @@ use std::time::Duration;
 
 use dry_core::inference::Request;
 
-/// Long enough for a local server to load a big model on the first request.
-const TIMEOUT: Duration = Duration::from_secs(600);
-
 /// `Authorization: Bearer <key>` from the named environment variable.
 fn bearer(key_env: &Option<String>) -> Result<Option<String>, String> {
     match key_env {
@@ -21,6 +18,10 @@ fn bearer(key_env: &Option<String>) -> Result<Option<String>, String> {
     }
 }
 
+/// No timeout on a model call: a local model may load, queue and think
+/// for as long as it needs (owner, 2026-11-24). A server that is not
+/// there refuses the connection at once.
+///
 /// POST the request's JSON body; returns the response body, whatever the
 /// status (an API error body is still read, so its message can be shown).
 pub fn post(req: &Request) -> Result<String, String> {
@@ -34,7 +35,6 @@ pub fn post(req: &Request) -> Result<String, String> {
     let mut resp = call
         .config()
         .http_status_as_error(false)
-        .timeout_global(Some(TIMEOUT))
         .build()
         .send(req.body.as_str())
         .map_err(|e| e.to_string())?;

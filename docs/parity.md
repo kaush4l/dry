@@ -149,7 +149,7 @@ In `/private/tmp/claude-501/-Users-kaush-Downloads-Dev-dry/cc927124-d30f-4ccd-90
 | `critique` (phase tool) | `tools/src/team.rs` `Critique` | none | ❌ | |
 | App state (`state` tool) | `tools/src/state.rs` | `GET /api/engines/:id/read`, `dry snapshot`, MCP `engines` group | 🟡 | For sessions over MCP; a model engine has no `state` tool |
 | Pages and components (`ui`, `page_create`, `page_delete`, `catalog`, `component`) | `tools/src/{ui,page,catalog}.rs` | `tools/src/app_tools.rs` (`page_create`, `page_add`, `page_delete`, `component_create`) | 🟡 | Over MCP, for sessions and engines alike; no node-by-node edit, no catalog lifecycle |
-| Theme (`css_get`, `css_set`, `css_reset`) | `tools/src/css.rs` | `app_tools.rs` (`token_set`, `token_reset`, `theme_use`), `dry token` | ✅ | Tokens, not CSS properties |
+| Theme (`css_get`, `css_set`, `css_reset`) | `tools/src/css.rs` | `app_tools.rs` (`token_set`, `token_reset`, `look`), `dry token` | ✅ | Tokens, not CSS properties |
 | `preview` (render a page) | `tools/src/preview.rs` | `core/src/browser.rs` (`browse`, `click`, `type`) | 🟡 | A general browser artifact; nothing renders the app's own pages for the engine |
 | `developer_create`, `worktree_create` | `api/src/{lib,projects}.rs` | none | ❌ | |
 | `telegram` | `api/src/telegram.rs` | none | ❌ | |

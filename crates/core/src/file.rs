@@ -51,11 +51,12 @@ pub const WRITES: [&str; 2] = ["edit", "save"];
 /// Most file names listed in the snapshot.
 pub const MAX_NAMES: usize = 200;
 /// Most files open at once; opening one more closes the oldest without
-/// unsaved edits.
-pub const MAX_OPEN: usize = 8;
-/// Most characters of the whole snapshot; past it an open file is cut, and
-/// the result says how to see the rest (`focus`).
-pub const SNAPSHOT_CHARS: usize = 24_000;
+/// unsaved edits. High for now, so a loop keeps the evidence it gathers in
+/// view; to be tuned against the window.
+pub const MAX_OPEN: usize = 32;
+/// Most characters of the whole snapshot (about 24k tokens); past it an
+/// open file is cut, and the result says how to see the rest (`focus`).
+pub const SNAPSHOT_CHARS: usize = 96_000;
 
 const FENCE: &str = "~~~";
 
@@ -706,7 +707,7 @@ pub(crate) mod tests {
             call(&mut text, &c(&format!("open(path=\"{n}\")")), &disk).unwrap();
         }
         let last = call(&mut text, &c(&format!("open(path=\"{}\")", names[MAX_OPEN])), &disk).unwrap();
-        assert!(last.ends_with("; closed f0 (8 open at most)"), "{last}");
+        assert!(last.ends_with(&format!("; closed f0 ({MAX_OPEN} open at most)")), "{last}");
     }
 
     #[test]

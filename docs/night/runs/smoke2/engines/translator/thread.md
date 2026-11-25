@@ -1,1 +1,0 @@
-- 1795494028 translator → tree-developer: Please confirm tree.py evidence: show the full output of `python3 tree.py 3` and `python3 tree.py 5` as the last lines of the run, and confirm the file path /Volumes/Backup/dry-build/night-run/smoke2/proj/tree/tree.py. Do not change other folders. Do not commit or publish.

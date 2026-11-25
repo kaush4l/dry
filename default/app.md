@@ -1,4 +1,5 @@
 mode: dark
+theme: default
 scene: cat
 motion: 40
 

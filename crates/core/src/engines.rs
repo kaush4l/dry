@@ -192,13 +192,27 @@ pub fn family(state: &State, i: usize, seen: &dyn Fn(usize) -> Seen) -> Family {
     }
 }
 
+/// How a reply's components are named to its parent (`replies`).
+pub const COMPONENTS: &str = "its components, to pass on as written";
+
 /// The replies engine `e` gave, oldest first: each `reply(text)` of its
-/// answers (with no contract, each answer).
+/// answers (with no contract, each answer). A reply that shows or asks
+/// with a component carries it on a last line, in the call grammar, so
+/// the parent can pass it on to the person (`turn::reply_components`).
 pub fn replies(e: &Engine) -> Vec<String> {
     e.messages
         .iter()
         .filter(|m| m.role == Role::Assistant)
-        .filter_map(|m| if e.response.is_empty() { Some(m.text.clone()) } else { crate::turn::reply_in(e, &m.text) })
+        .filter_map(|m| {
+            if e.response.is_empty() {
+                return Some(m.text.clone());
+            }
+            let text = crate::turn::reply_in(e, &m.text)?;
+            Some(match crate::turn::reply_components(e, &m.text) {
+                Some(c) => format!("{text}\n({COMPONENTS}: {c})"),
+                None => text,
+            })
+        })
         .collect()
 }
 
@@ -803,6 +817,30 @@ mod tests {
         assert!(out.contains("→ error: `save` is refused"), "{out}");
         assert!(out.contains("→ error: refused: this terminal is read-only (uses: [terminal:read])"), "{out}");
         assert!(!s.engines[i].artifacts["code"].contains("edit:") && !s.engines[i].artifacts["terminal"].contains("session:"));
+    }
+
+    #[test]
+    fn a_childs_reply_with_components_reaches_the_parent_with_them() {
+        let mut s = parent();
+        s.add_text(0, "the inner planets as a table");
+        step(&mut s, 0, "engine_call(name=\"ans\", goal=\"Answer as a table.\")");
+        let said = "reply(text=\"Smallest first.\", show=\"table\", data=\"Planet|Moons;Mercury|0;Earth|1\")";
+        assert_eq!(step(&mut s, 1, said).0, Step::Reply("Smallest first.".into()));
+        settle(&mut s, 0, &idle);
+        let p = prompt(&s, 0);
+        let line = "last reply: Smallest first.\n(its components, to pass on as written: show=\"table\", data=\"Planet|Moons;Mercury|0;Earth|1\")";
+        assert!(p.contains(line), "{p}");
+        // Passed on as written, the parent's reply shows the same table.
+        let passed = "reply(text=\"Smallest first.\", show=\"table\", data=\"Planet|Moons;Mercury|0;Earth|1\")";
+        step(&mut s, 0, passed);
+        let shown = |i: usize| {
+            let e = &s.engines[i];
+            let m = e.messages.iter().rev().find(|m| m.role == Role::Assistant).unwrap();
+            crate::ask::reply_call(e, &m.text).map(|c| crate::ask::Parsed::of(&c).show)
+        };
+        assert!(shown(0).flatten().is_some() && shown(0) == shown(1), "the same display in both");
+        // Text alone carries no such line.
+        assert_eq!(crate::turn::reply_components(&s.engines[1], "thought: x\nact: reply(text=\"hi\")"), None);
     }
 
     #[test]

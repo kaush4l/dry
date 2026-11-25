@@ -5,16 +5,17 @@
 //! Like Astryx's `light-dark(light, dark)` tokens, every colour is a pair.
 //! The `Mode` picks one side.
 //!
-//! The values live in theme files, `themes/<name>.md` at the repo root (the
-//! active one is named in `themes/active`; `default` when there is none):
+//! The values live in theme files, `themes/<name>/theme.md` at the repo
+//! root, one folder each (`crate::look`; app.md's `theme:` names the active
+//! one, `default` when it names none):
 //! each row holds a token's current value and its default. The code
 //! only knows the token *names* (`COLOR_NAMES`, `NUMBER_NAMES`). `Theme`
 //! is that file read in: `defaults` plus `changes` (the rows whose value
 //! differs from the default). `resolve` layers the two into the `Tokens`
 //! every component reads; reset removes a change and the default is back.
 //!
-//! Colours are `0xRRGGBBAA`. `themes/default.md` follows Astryx's default
-//! theme; `themes/terminal.md` is black and phosphor green, in a monospace font.
+//! Colours are `0xRRGGBBAA`. `themes/default/theme.md` follows Astryx's default
+//! theme; `themes/terminal/theme.md` is black and phosphor green, in a monospace font.
 
 use std::collections::BTreeMap;
 
@@ -589,7 +590,7 @@ pub fn pick_font(options: &[FontOption]) -> Option<&FontOption> {
 /// The text above the tables in the theme file.
 const MD_INTRO: &str = "# Theme
 
-One theme: the design tokens for the whole app. Every colour, size and the font are read from the active theme (`themes/active` names it); the UI tokens page (`/settings/ui`) and `cargo run -p dry-tools -- token ...` write back to it. A value that differs from its default is a change; reset puts the default back.
+One theme: the design tokens for the whole app. Every colour, size and the font are read from the active theme (app.md's `theme:` names its folder); the UI tokens page (`/settings/ui`) and `cargo run -p dry-tools -- token ...` write back to it. A value that differs from its default is a change; reset puts the default back.
 
 Colours are `#RRGGBBAA`. Text outside the tables is rewritten when the tools save.
 ";
@@ -802,24 +803,24 @@ mod tests {
 
     /// The default theme file the app ships with.
     fn shipped() -> Theme {
-        Theme::from_md(include_str!("../../../themes/default.md")).expect("themes/default.md parses")
+        Theme::from_md(&crate::look::shipped(crate::look::Kind::Theme, "default")).expect("themes/default/theme.md parses")
     }
 
-    /// Every theme file the app ships with, by name.
-    const SHIPPED: &[(&str, &str)] = &[
-        ("default", include_str!("../../../themes/default.md")),
-        ("terminal", include_str!("../../../themes/terminal.md")),
-        ("cat", include_str!("../../../themes/cat.md")),
-        ("abyss", include_str!("../../../themes/abyss.md")),
-        ("bolt", include_str!("../../../themes/bolt.md")),
-    ];
+    /// Every theme the app ships with, `(name, text)`, read from `themes/`.
+    fn shipped_all() -> Vec<(String, String)> {
+        crate::look::shipped_all(crate::look::Kind::Theme)
+    }
+
+    fn shipped_text(name: &str) -> String {
+        crate::look::shipped(crate::look::Kind::Theme, name)
+    }
 
     #[test]
     fn an_older_theme_with_scene_rows_still_reads_and_drops_them() {
         // The rows themes had before the scene was a setting with its own colours.
         let old = format!(
             "{}\n| scene_1 | #D9733FFF | #E8875AFF | #D9733FFF | #E8875AFF | fur |\n\n## Sizes\n| token | value | default |\n| motion | 30 | 40 |\n\n## Scene\n\n| token | value | default | use |\n|---|---|---|---|\n| scene | cat | cat | x |\n",
-            SHIPPED[0].1.split("\n## Sizes").next().unwrap()
+            shipped_text("default").split("\n## Sizes").next().unwrap()
         );
         let t = Theme::from_md(&old).unwrap();
         assert!(!t.defaults.colors.contains_key("scene_1"), "the scene ink is dropped");
@@ -844,17 +845,17 @@ mod tests {
 
     #[test]
     fn every_shipped_theme_parses_has_every_token_and_no_changes() {
-        for (name, text) in SHIPPED {
-            let theme = Theme::from_md(text).unwrap_or_else(|e| panic!("themes/{name}.md: {e}"));
-            assert_eq!(theme.missing(), Vec::<&str>::new(), "themes/{name}.md");
-            assert_eq!(theme.changes, Overrides::default(), "themes/{name}.md ships its values as its defaults");
-            assert_eq!(Theme::from_md(&theme.to_md()).unwrap(), theme, "themes/{name}.md writes back the same");
+        for (name, text) in shipped_all() {
+            let theme = Theme::from_md(&text).unwrap_or_else(|e| panic!("themes/{name}/theme.md: {e}"));
+            assert_eq!(theme.missing(), Vec::<&str>::new(), "themes/{name}/theme.md");
+            assert_eq!(theme.changes, Overrides::default(), "themes/{name}/theme.md ships its values as its defaults");
+            assert_eq!(Theme::from_md(&theme.to_md()).unwrap(), theme, "themes/{name}/theme.md writes back the same");
         }
     }
 
     #[test]
     fn the_terminal_theme_is_flat_black_and_monospace() {
-        let theme = Theme::from_md(SHIPPED[1].1).unwrap();
+        let theme = Theme::from_md(&shipped_text("terminal")).unwrap();
         let dark = resolve(Mode::Dark, &theme);
         assert_eq!(dark.background_body, 0x000000FF);
         assert_eq!(dark.font_family, "Menlo");
@@ -922,8 +923,8 @@ mod tests {
         let top = Overrides::from_md("## Sizes\n| radius | 3 |\n").unwrap();
         let t = resolve(Mode::Dark, &layered(&shipped(), &[&base, &top]));
         assert_eq!((t.radius, t.space_1), (3.0, 2.0));
-        let whole = Overrides::from_md(SHIPPED[1].1).unwrap();
-        assert_eq!(resolve(Mode::Dark, &layered(&shipped(), &[&whole])), resolve(Mode::Dark, &Theme::from_md(SHIPPED[1].1).unwrap()));
+        let whole = Overrides::from_md(&shipped_text("terminal")).unwrap();
+        assert_eq!(resolve(Mode::Dark, &layered(&shipped(), &[&whole])), resolve(Mode::Dark, &Theme::from_md(&shipped_text("terminal")).unwrap()));
         assert!(Overrides::default().is_empty() && !base.is_empty());
     }
 

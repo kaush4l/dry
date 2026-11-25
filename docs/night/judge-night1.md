@@ -1,5 +1,7 @@
 # Judgment: night1 run (black box)
 
+> The run captures this cites (`docs/night/runs/`) are not in the tree; they are in commit `992cc0f`: `git show 992cc0f:docs/night/runs/<path>`.
+
 > **Operator's corrections, checked after the report (2026-11-24 04:20).**
 > The judge's text below is left as written. Two of its claims do not hold:
 >

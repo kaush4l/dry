@@ -69,13 +69,13 @@ fn reduced_motion() -> bool {
 
 /// A scene by name from the bundle.
 pub fn named(name: &str) -> Option<Scene> {
-    let text = bundle::FILES.iter().find(|(p, _)| *p == format!("scenes/{name}.md")).map(|(_, t)| *t)?;
+    let text = bundle::FILES.iter().find(|(p, _)| *p == dry_core::look::main_path(dry_core::look::Kind::Scene, name)).map(|(_, t)| *t)?;
     Scene::from_md(name, text).ok()
 }
 
 /// A theme by name from the bundle.
 pub fn theme_named(name: &str) -> Option<Theme> {
-    let text = bundle::FILES.iter().find(|(p, _)| *p == format!("themes/{name}.md")).map(|(_, t)| *t)?;
+    let text = bundle::FILES.iter().find(|(p, _)| *p == dry_core::look::main_path(dry_core::look::Kind::Theme, name)).map(|(_, t)| *t)?;
     Theme::from_md(text).ok()
 }
 
